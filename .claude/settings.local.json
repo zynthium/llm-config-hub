@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(cargo check:*)",
+      "Bash(python3:*)",
+      "Bash(sed -n '180,200p' /Users/joeslee/Projects/llm-config-hub/src-tauri/src/services/health_check.rs)",
+      "Bash(sed -n '270,305p' /Users/joeslee/Projects/llm-config-hub/src-tauri/src/services/health_check.rs)",
+      "Bash(cargo build:*)",
+      "Bash(open:*)",
+      "WebSearch",
+      "mcp__deepwiki__ask_question",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:opencode.ai)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s https://raw.githubusercontent.com/sst/opencode/refs/heads/dev/packages/opencode/src/config/config.ts)",
+      "Bash(curl -s https://raw.githubusercontent.com/sst/opencode/refs/heads/dev/packages/opencode/src/provider/provider.ts)",
+      "Bash(curl -s https://raw.githubusercontent.com/openai/codex/main/codex-cli/README.md)",
+      "Bash(curl -s https://raw.githubusercontent.com/google-gemini/gemini-cli/main/docs/cli/configuration.md)",
+      "Bash(curl -s https://raw.githubusercontent.com/openai/codex/refs/heads/main/codex-rs/core/config.schema.json)",
+      "Bash(curl -s https://raw.githubusercontent.com/google-gemini/gemini-cli/refs/heads/main/docs/cli/configuration.md)",
+      "Bash(find src-tauri/src -name *.rs)",
+      "Bash(find src-tauri/src/services -name *.rs)",
+      "Bash(xargs ls:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(curl:*)"
+    ]
+  }
+}
