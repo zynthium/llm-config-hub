@@ -12,6 +12,10 @@ use tauri::{
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // Hide from Dock — app lives only in the status bar tray
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
