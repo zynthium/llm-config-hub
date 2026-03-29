@@ -43,7 +43,7 @@ jobs:
       - name: Build Intel macOS
         run: |
           rustup target add x86_64-apple-darwin
-          cargo tauri build --target x86_64-apple-darwin -- --release
+          cargo tauri build --target x86_64-apple-darwin
 
       - name: Create Intel DMG
         run: |
@@ -98,7 +98,7 @@ jobs:
       - name: Build ARM64 macOS
         run: |
           rustup target add aarch64-apple-darwin
-          cargo tauri build --target aarch64-apple-darwin -- --release
+          cargo tauri build --target aarch64-apple-darwin
 
       - name: Create ARM64 DMG
         run: |
