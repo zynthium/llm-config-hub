@@ -149,12 +149,19 @@ jobs:
         with:
           name: intel-app
           path: build/intel
+          merge-multiple: true
 
       - name: Download ARM64 .app
         uses: actions/download-artifact@v4
         with:
           name: arm64-app
           path: build/arm64
+          merge-multiple: true
+
+      - name: List downloaded files
+        run: |
+          ls -la build/intel/
+          ls -la build/arm64/
 
       - name: Create Universal Binary
         run: |
