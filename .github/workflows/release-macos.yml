@@ -3,18 +3,13 @@ name: Release macOS (Intel & Apple Silicon)
 on:
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g., v0.1.0)'
-        required: false
-        default: ''
+
+permissions:
+  contents: write
 
 jobs:
   build-intel:
     runs-on: macos-latest
-    env:
-      TAG_NAME: ${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -71,14 +66,12 @@ jobs:
         with:
           files: artifacts/intel/*.dmg
           generate_release_notes: false
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-arm64:
     runs-on: macos-latest
-    env:
-      TAG_NAME: ${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -135,15 +128,13 @@ jobs:
         with:
           files: artifacts/arm64/*.dmg
           generate_release_notes: false
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-universal:
     needs: [build-intel, build-arm64]
     runs-on: macos-latest
-    env:
-      TAG_NAME: ${{ github.event.release.tag_name || github.event.inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -194,6 +185,6 @@ jobs:
         with:
           files: artifacts/universal/*.dmg
           generate_release_notes: false
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
