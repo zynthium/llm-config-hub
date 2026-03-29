@@ -1,24 +1,21 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Ignore environment and local configuration files
+.env
+**/.env
+credentials.json
+**/credentials.*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Sensitive keys and certificates
+**/*.pem
+**/*.key
+**/*.crt
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Local databases and caches
+backend/llm_config_hub.db
+**/llm_config_hub.db
+node_modules/
+__pycache__/
+.venv/
+.env.local
+
+# macOS specific
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
