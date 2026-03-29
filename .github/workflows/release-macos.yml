@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine App Name (Intel)
+      - name: Determine App Name
         id: appname
         run: |
           APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | head -n1)
@@ -24,14 +24,10 @@ jobs:
           node-version: '20'
 
       - name: Install frontend
-        run: |
-          cd frontend
-          npm ci
+        run: npm ci
 
       - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
+        run: npm run build
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -66,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine App Name (ARM64)
+      - name: Determine App Name
         id: appname
         run: |
           APP_PATH=$(ls -1 src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app | head -n1)
@@ -79,14 +75,10 @@ jobs:
           node-version: '20'
 
       - name: Install frontend
-        run: |
-          cd frontend
-          npm ci
+        run: npm ci
 
       - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
+        run: npm run build
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -121,7 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine App Name (Universal)
+      - name: Determine App Name
         id: appname
         run: |
           APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | head -n1)
@@ -143,7 +135,7 @@ jobs:
           intel_bundle="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app"
           universal_app_dir="build/universal/${APP_NAME}-universal.app"
           cp -R "$intel_bundle" "$universal_app_dir"
-          cp "build/universal/${APP_NAME}-universal" "$universal_app_dir/Contents/MacOS/$APP_NAME"
+          cp "build/universal/$APP_NAME-universal" "$universal_app_dir/Contents/MacOS/$APP_NAME"
 
       - name: Create Universal DMG
         run: |
