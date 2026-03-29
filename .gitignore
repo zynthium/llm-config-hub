@@ -19,3 +19,38 @@ __pycache__/
 
 # macOS specific
 .DS_Store
+
+# Frontend / Node related
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/node_modules/
+
+# Python virtual environments
+venv/
+.venv/
+ENV/
+.env/
+.env.*
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Databases / caches
+*.sqlite3
+*.db
+.pytest_cache/
+.cache/
+.coverage
+.coverage.*
+
+# Logs
+*.log
+
+# IDEs / editors
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
