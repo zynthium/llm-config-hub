@@ -14,8 +14,13 @@ jobs:
       - name: Determine App Name
         id: appname
         run: |
-          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | head -n1)
-          APP_NAME=$(basename "$APP_PATH" .app)
+          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | head -n1)
+          if [ -z "$APP_PATH" ]; then
+            # If not built yet, check the config
+            APP_NAME="llm-config-hub"
+          else
+            APP_NAME=$(basename "$APP_PATH" .app)
+          fi
           echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Setup Node
@@ -30,10 +35,10 @@ jobs:
         run: npm run build
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          targets: x86_64-apple-darwin
+        run: rustup default stable
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
 
       - name: Build Intel macOS
         run: |
@@ -65,8 +70,12 @@ jobs:
       - name: Determine App Name
         id: appname
         run: |
-          APP_PATH=$(ls -1 src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app | head -n1)
-          APP_NAME=$(basename "$APP_PATH" .app)
+          APP_PATH=$(ls -1 src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | head -n1)
+          if [ -z "$APP_PATH" ]; then
+            APP_NAME="llm-config-hub"
+          else
+            APP_NAME=$(basename "$APP_PATH" .app)
+          fi
           echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Setup Node
@@ -81,10 +90,10 @@ jobs:
         run: npm run build
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          targets: aarch64-apple-darwin
+        run: rustup default stable
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
 
       - name: Build ARM64 macOS
         run: |
@@ -116,8 +125,12 @@ jobs:
       - name: Determine App Name
         id: appname
         run: |
-          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | head -n1)
-          APP_NAME=$(basename "$APP_PATH" .app)
+          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | head -n1)
+          if [ -z "$APP_PATH" ]; then
+            APP_NAME="llm-config-hub"
+          else
+            APP_NAME=$(basename "$APP_PATH" .app)
+          fi
           echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Create Universal Binary
