@@ -64,6 +64,7 @@ jobs:
         with:
           files: artifacts/intel/*.dmg
           generate_release_notes: false
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -125,6 +126,7 @@ jobs:
         with:
           files: artifacts/arm64/*.dmg
           generate_release_notes: false
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -181,5 +183,6 @@ jobs:
         with:
           files: artifacts/universal/*.dmg
           generate_release_notes: false
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
