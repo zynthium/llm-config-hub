@@ -14,13 +14,7 @@ jobs:
       - name: Determine App Name
         id: appname
         run: |
-          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | head -n1)
-          if [ -z "$APP_PATH" ]; then
-            # If not built yet, check the config
-            APP_NAME="llm-config-hub"
-          else
-            APP_NAME=$(basename "$APP_PATH" .app)
-          fi
+          APP_NAME="llm-config-hub"
           echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Setup Node
@@ -45,10 +39,22 @@ jobs:
           rustup target add x86_64-apple-darwin
           cargo tauri build --target x86_64-apple-darwin
 
+      - name: Find bundle path
+        id: find-bundle
+        run: |
+          BUNDLE_PATH=$(find src-tauri/target -name "*.app" -type d 2>/dev/null | head -n1)
+          echo "BUNDLE_PATH=$BUNDLE_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload .app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: intel-app
+          path: ${{ steps.find-bundle.outputs.BUNDLE_PATH }}
+
       - name: Create Intel DMG
         run: |
+          intel_bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          intel_bundle="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app"
           dmg_path="artifacts/intel/${APP_NAME}-intel-macos.dmg"
           mkdir -p artifacts/intel
           hdiutil create -volname "${APP_NAME} Intel" -srcfolder "$intel_bundle" -ov -format UDZO "$dmg_path"
@@ -62,7 +68,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-arm64:
-    needs: build-intel
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,12 +75,7 @@ jobs:
       - name: Determine App Name
         id: appname
         run: |
-          APP_PATH=$(ls -1 src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | head -n1)
-          if [ -z "$APP_PATH" ]; then
-            APP_NAME="llm-config-hub"
-          else
-            APP_NAME=$(basename "$APP_PATH" .app)
-          fi
+          APP_NAME="llm-config-hub"
           echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Setup Node
@@ -100,10 +100,22 @@ jobs:
           rustup target add aarch64-apple-darwin
           cargo tauri build --target aarch64-apple-darwin
 
+      - name: Find bundle path
+        id: find-bundle
+        run: |
+          BUNDLE_PATH=$(find src-tauri/target -name "*.app" -type d 2>/dev/null | head -n1)
+          echo "BUNDLE_PATH=$BUNDLE_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload .app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-app
+          path: ${{ steps.find-bundle.outputs.BUNDLE_PATH }}
+
       - name: Create ARM64 DMG
         run: |
+          arm_bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          arm_bundle="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/$APP_NAME.app"
           dmg_path="artifacts/arm64/${APP_NAME}-arm64-macos.dmg"
           mkdir -p artifacts/arm64
           hdiutil create -volname "${APP_NAME} Apple Silicon" -srcfolder "$arm_bundle" -ov -format UDZO "$dmg_path"
@@ -125,19 +137,26 @@ jobs:
       - name: Determine App Name
         id: appname
         run: |
-          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | head -n1)
-          if [ -z "$APP_PATH" ]; then
-            APP_NAME="llm-config-hub"
-          else
-            APP_NAME=$(basename "$APP_PATH" .app)
-          fi
+          APP_NAME="llm-config-hub"
           echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Download Intel .app
+        uses: actions/download-artifact@v4
+        with:
+          name: intel-app
+          path: build/intel
+
+      - name: Download ARM64 .app
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-app
+          path: build/arm64
 
       - name: Create Universal Binary
         run: |
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          intel_exec="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app/Contents/MacOS/$APP_NAME"
-          arm_exec="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+          intel_exec="build/intel/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+          arm_exec="build/arm64/$APP_NAME.app/Contents/MacOS/$APP_NAME"
           universal_bin="build/universal/$APP_NAME-universal"
           mkdir -p build/universal
           lipo -create "$intel_exec" "$arm_exec" -o "$universal_bin"
@@ -145,7 +164,7 @@ jobs:
       - name: Create Universal App
         run: |
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          intel_bundle="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app"
+          intel_bundle="build/intel/$APP_NAME.app"
           universal_app_dir="build/universal/${APP_NAME}-universal.app"
           cp -R "$intel_bundle" "$universal_app_dir"
           cp "build/universal/$APP_NAME-universal" "$universal_app_dir/Contents/MacOS/$APP_NAME"
