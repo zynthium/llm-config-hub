@@ -1,0 +1,161 @@
+name: Release macOS (Intel & Apple Silicon)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-intel:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine App Name (Intel)
+        id: appname
+        run: |
+          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | head -n1)
+          APP_NAME=$(basename "$APP_PATH" .app)
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          targets: x86_64-apple-darwin
+
+      - name: Build Intel macOS
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo tauri build --release --target x86_64-apple-darwin
+
+      - name: Create Intel DMG
+        run: |
+          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
+          intel_bundle="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app"
+          dmg_path="artifacts/intel/${APP_NAME}-intel-macos.dmg"
+          mkdir -p artifacts/intel
+          hdiutil create -volname "${APP_NAME} Intel" -srcfolder "$intel_bundle" -ov -format UDZO "$dmg_path"
+
+      - name: Upload Intel artifact
+        uses: actions/upload-release-asset@v3
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: artifacts/intel/*.dmg
+          asset_name: "${{ steps.appname.outputs.APP_NAME }}-intel-macos.dmg"
+          asset_content_type: application/octet-stream
+
+  build-arm64:
+    needs: build-intel
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine App Name (ARM64)
+        id: appname
+        run: |
+          APP_PATH=$(ls -1 src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app | head -n1)
+          APP_NAME=$(basename "$APP_PATH" .app)
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend
+        run: |
+          cd/frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd/frontend
+          npm run build
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+
+      - name: Build ARM64 macOS
+        run: |
+          rustup target add aarch64-apple-darwin
+          cargo tauri build --release --target aarch64-apple-darwin
+
+      - name: Create ARM64 DMG
+        run: |
+          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
+          arm_bundle="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/$APP_NAME.app"
+          dmg_path="artifacts/arm64/${APP_NAME}-arm64-macos.dmg"
+          mkdir -p artifacts/arm64
+          hdiutil create -volname "${APP_NAME} Apple Silicon" -srcfolder "$arm_bundle" -ov -format UDZO "$dmg_path"
+
+      - name: Upload ARM64 artifact
+        uses: actions/upload-release-asset@v3
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: artifacts/arm64/*.dmg
+          asset_name: "${{ steps.appname.outputs.APP_NAME }}-arm64-macos.dmg"
+          asset_content_type: application/octet-stream
+
+  build-universal:
+    needs: [build-intel, build-arm64]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine App Name (Universal)
+        id: appname
+        run: |
+          APP_PATH=$(ls -1 src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | head -n1)
+          APP_NAME=$(basename "$APP_PATH" .app)
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Universal Binary
+        run: |
+          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
+          intel_exec="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+          arm_exec="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+          universal_bin="build/universal/$APP_NAME-universal"
+          mkdir -p build/universal
+          lipo -create "$intel_exec" "$arm_exec" -o "$universal_bin"
+
+      - name: Create Universal App
+        run: |
+          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
+          intel_bundle="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APP_NAME.app"
+          universal_app_dir="build/universal/${APP_NAME}-universal.app"
+          cp -R "$intel_bundle" "$universal_app_dir"
+          cp "build/universal/${APP_NAME}-universal" "$universal_app_dir/Contents/MacOS/$APP_NAME"
+
+      - name: Create Universal DMG
+        run: |
+          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
+          dmg_path="artifacts/universal/${APP_NAME}-universal-macos.dmg"
+          mkdir -p artifacts/universal
+          hdiutil create -volname "${APP_NAME} Universal" -srcfolder "build/universal/${APP_NAME}-universal.app" -ov -format UDZO "$dmg_path"
+
+      - name: Upload Universal artifact
+        uses: actions/upload-release-asset@v3
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: artifacts/universal/*.dmg
+          asset_name: "${{ steps.appname.outputs.APP_NAME }}-universal-macos.dmg"
+          asset_content_type: application/octet-stream
