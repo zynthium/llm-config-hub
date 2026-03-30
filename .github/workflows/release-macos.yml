@@ -216,11 +216,23 @@ jobs:
           path: build/arm64
           merge-multiple: true
 
+      - name: List downloaded files
+        run: |
+          echo "=== Intel bundle structure ==="
+          find build/intel -type f -name "*" 2>/dev/null | head -20
+          echo "=== ARM64 bundle structure ==="
+          find build/arm64 -type f -name "*" 2>/dev/null | head -20
+          echo "=== Intel .app contents ==="
+          ls -laR build/intel/*.app/Contents/MacOS/ 2>/dev/null || echo "No Intel .app found"
+          echo "=== ARM64 .app contents ==="
+          ls -laR build/arm64/*.app/Contents/MacOS/ 2>/dev/null || echo "No ARM64 .app found"
+
       - name: Locate Intel binary (universal)
         id: locate-intel-univ
         run: |
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           intel_bundle=$(find build/intel -name "*.app" -type d 2>/dev/null | head -n1)
+          echo "Intel bundle: $intel_bundle"
           if [ -z "$intel_bundle" ]; then
             echo "INTEL_BIN=" >> $GITHUB_OUTPUT
           else
@@ -229,6 +241,7 @@ jobs:
             else
               INTEL_BIN=$(ls -1 "$intel_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
             fi
+            echo "Intel binary: $INTEL_BIN"
             echo "INTEL_BIN=$INTEL_BIN" >> $GITHUB_OUTPUT
           fi
 
@@ -237,6 +250,7 @@ jobs:
         run: |
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           arm_bundle=$(find build/arm64 -name "*.app" -type d 2>/dev/null | head -n1)
+          echo "ARM bundle: $arm_bundle"
           if [ -z "$arm_bundle" ]; then
             echo "ARM_BIN=" >> $GITHUB_OUTPUT
           else
@@ -245,19 +259,17 @@ jobs:
             else
               ARM_BIN=$(ls -1 "$arm_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
             fi
+            echo "ARM binary: $ARM_BIN"
             echo "ARM_BIN=$ARM_BIN" >> $GITHUB_OUTPUT
           fi
-
-      - name: List downloaded files
-        run: |
-          ls -la build/intel/
-          ls -la build/arm64/
 
       - name: Create Universal Binary
         run: |
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           intel_bin="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
           arm_bin="${{ steps.locate-arm-univ.outputs.ARM_BIN }}"
+          echo "Intel binary: $intel_bin"
+          echo "ARM binary: $arm_bin"
           universal_bin="build/universal/$APP_NAME-universal"
           mkdir -p build/universal
           lipo -create "$intel_bin" "$arm_bin" -o "$universal_bin"
