@@ -281,7 +281,7 @@ jobs:
             echo "ARM_BIN=$ARM_BIN" >> $GITHUB_OUTPUT
           fi
 
-      - name: Debug: Universal preflight
+      - name: "Debug: Universal preflight"
         run: |
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           INTEL_BIN="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
