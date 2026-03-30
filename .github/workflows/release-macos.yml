@@ -88,7 +88,7 @@ jobs:
       - name: List bundle contents
         run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
-      - name: Debug: Intel/ARM bundle contents
+      - name: "Debug: Intel/ARM bundle contents"
         run: |
           echo "Intel build tree (if present):" 
           if [ -d "build/intel" ]; then
