@@ -88,6 +88,21 @@ jobs:
       - name: List bundle contents
         run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
+      - name: Debug: Intel/ARM bundle contents
+        run: |
+          echo "Intel build tree (if present):" 
+          if [ -d "build/intel" ]; then
+            find build/intel -maxdepth 3 -type f -print
+          else
+            echo "build/intel not found"
+          fi
+          echo "ARM64 build tree (if present):" 
+          if [ -d "build/arm64" ]; then
+            find build/arm64 -maxdepth 3 -type f -print
+          else
+            echo "build/arm64 not found"
+          fi
+
       - name: Upload .app bundle
         uses: actions/upload-artifact@v4
         with:
