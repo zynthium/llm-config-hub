@@ -8,157 +8,46 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_NAME: llm-config-hub
+
 jobs:
-  build-intel:
+  build-arch:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: intel
+            target: x86_64-apple-darwin
+            artifact_name: intel-app
+            volume_suffix: Intel
+          - arch: arm64
+            target: aarch64-apple-darwin
+            artifact_name: arm64-app
+            volume_suffix: Apple Silicon
     steps:
       - uses: actions/checkout@v4
-
-      - name: Determine App Name
-        id: appname
-        run: |
-          APP_NAME="llm-config-hub"
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install frontend
         run: npm ci
 
-      - name: Build frontend
-        run: npm run build
-
       - name: Setup Rust
-        run: rustup default stable
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli
-
-      - name: Cache npm
-        uses: actions/cache@v4
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-cache-${{ hashFiles('package-lock.json') }}
+          targets: ${{ matrix.target }}
 
-      - name: Cache Node modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
 
-      - name: Build Intel macOS
-        run: |
-          rustup target add x86_64-apple-darwin
-          cargo tauri build --target x86_64-apple-darwin
-
-      - name: Find bundle path
-        id: find-bundle
-        run: |
-          find src-tauri/target -name "*.app" -type d 2>/dev/null
-          BUNDLE_PATH=$(find src-tauri/target -name "*.app" -type d 2>/dev/null | head -n1)
-          echo "BUNDLE_PATH=$BUNDLE_PATH" >> $GITHUB_OUTPUT
-
-      - name: Locate Intel binary
-        id: locate-intel
-        run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
-          if [ -f "$bundle/Contents/MacOS/$APP_NAME" ]; then
-            INTEL_BIN="$bundle/Contents/MacOS/$APP_NAME"
-          else
-            INTEL_BIN=$(ls -1 "$bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
-          fi
-          echo "INTEL_BIN=$INTEL_BIN" >> $GITHUB_OUTPUT
-
-      - name: Locate ARM binary
-        id: locate-arm
-        run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
-          if [ -f "$bundle/Contents/MacOS/$APP_NAME" ]; then
-            ARM_BIN="$bundle/Contents/MacOS/$APP_NAME"
-          else
-            ARM_BIN=$(ls -1 "$bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
-          fi
-          echo "ARM_BIN=$ARM_BIN" >> $GITHUB_OUTPUT
-
-      - name: List bundle contents
-        run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
-
-      - name: "Debug: Intel/ARM bundle contents"
-        run: |
-          echo "Intel build tree (if present):" 
-          if [ -d "build/intel" ]; then
-            find build/intel -maxdepth 3 -type f -print
-          else
-            echo "build/intel not found"
-          fi
-          echo "ARM64 build tree (if present):" 
-          if [ -d "build/arm64" ]; then
-            find build/arm64 -maxdepth 3 -type f -print
-          else
-            echo "build/arm64 not found"
-          fi
-
-      - name: Upload .app bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: intel-app
-          path: ${{ steps.find-bundle.outputs.BUNDLE_PATH }}
-
-      - name: Create Intel DMG
-        run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          intel_bin="${{ steps.locate-intel.outputs.INTEL_BIN }}"
-          dmg_path="artifacts/intel/${APP_NAME}-intel-macos.dmg"
-          mkdir -p artifacts/intel
-          hdiutil create -volname "${APP_NAME} Intel" -srcfolder "$intel_bin" -ov -format UDZO "$dmg_path"
-
-      - name: Upload Intel artifact
-        if: ${{ github.event_name == 'release' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/intel/*.dmg
-          generate_release_notes: false
-          tag_name: ${{ github.event.release.tag_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-arm64:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Determine App Name
-        id: appname
-        run: |
-          APP_NAME="llm-config-hub"
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install frontend
-        run: npm ci
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Setup Rust
-        run: rustup default stable
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli
-
-      - name: Build ARM64 macOS
-        run: |
-          rustup target add aarch64-apple-darwin
-          cargo tauri build --target aarch64-apple-darwin
+      - name: Build macOS
+        run: npx tauri build --target ${{ matrix.target }}
 
       - name: Find bundle path
         id: find-bundle
@@ -170,55 +59,34 @@ jobs:
       - name: List bundle contents
         run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
-      - name: Locate ARM binary
-        id: locate-arm
-        run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
-          echo "Looking for binary in bundle: $bundle"
-          if [ -f "$bundle/Contents/MacOS/$APP_NAME" ]; then
-            ARM_BIN="$bundle/Contents/MacOS/$APP_NAME"
-          else
-            ARM_BIN=$(ls -1 "$bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
-          fi
-          echo "Found binary: $ARM_BIN"
-          echo "ARM_BIN=$ARM_BIN" >> $GITHUB_OUTPUT
-
       - name: Upload .app bundle
         uses: actions/upload-artifact@v4
         with:
-          name: arm64-app
+          name: ${{ matrix.artifact_name }}
           path: ${{ steps.find-bundle.outputs.BUNDLE_PATH }}
 
-      - name: Create ARM64 DMG
+      - name: Create DMG
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          arm_bin="${{ steps.locate-arm.outputs.ARM_BIN }}"
-          dmg_path="artifacts/arm64/${APP_NAME}-arm64-macos.dmg"
-          mkdir -p artifacts/arm64
-          hdiutil create -volname "${APP_NAME} Apple Silicon" -srcfolder "$arm_bin" -ov -format UDZO "$dmg_path"
+          bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
+          dmg_path="artifacts/${{ matrix.arch }}/${APP_NAME}-${{ matrix.arch }}-macos.dmg"
+          mkdir -p "artifacts/${{ matrix.arch }}"
+          hdiutil create -volname "${APP_NAME} ${{ matrix.volume_suffix }}" -srcfolder "$bundle" -ov -format UDZO "$dmg_path"
 
-      - name: Upload ARM64 artifact
+      - name: Upload DMG artifact
         if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/arm64/*.dmg
+          files: artifacts/${{ matrix.arch }}/*.dmg
           generate_release_notes: false
           tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-universal:
-    needs: [build-intel, build-arm64]
+    needs: [build-arch]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Determine App Name
-        id: appname
-        run: |
-          APP_NAME="llm-config-hub"
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Download Intel .app
         uses: actions/download-artifact@v4
@@ -248,11 +116,11 @@ jobs:
       - name: Locate Intel binary (universal)
         id: locate-intel-univ
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           intel_bundle=$(find build/intel -name "*.app" -type d 2>/dev/null | head -n1)
           echo "Intel bundle: $intel_bundle"
           if [ -z "$intel_bundle" ]; then
             echo "INTEL_BIN=" >> $GITHUB_OUTPUT
+            echo "INTEL_BUNDLE=" >> $GITHUB_OUTPUT
           else
             if [ -f "$intel_bundle/Contents/MacOS/$APP_NAME" ]; then
               INTEL_BIN="$intel_bundle/Contents/MacOS/$APP_NAME"
@@ -260,17 +128,19 @@ jobs:
               INTEL_BIN=$(ls -1 "$intel_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
             fi
             echo "Intel binary: $INTEL_BIN"
+            echo "Intel bundle output: $intel_bundle"
+            echo "INTEL_BUNDLE=$intel_bundle" >> $GITHUB_OUTPUT
             echo "INTEL_BIN=$INTEL_BIN" >> $GITHUB_OUTPUT
           fi
 
       - name: Locate ARM binary (universal)
         id: locate-arm-univ
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           arm_bundle=$(find build/arm64 -name "*.app" -type d 2>/dev/null | head -n1)
           echo "ARM bundle: $arm_bundle"
           if [ -z "$arm_bundle" ]; then
             echo "ARM_BIN=" >> $GITHUB_OUTPUT
+            echo "ARM_BUNDLE=" >> $GITHUB_OUTPUT
           else
             if [ -f "$arm_bundle/Contents/MacOS/$APP_NAME" ]; then
               ARM_BIN="$arm_bundle/Contents/MacOS/$APP_NAME"
@@ -278,12 +148,13 @@ jobs:
               ARM_BIN=$(ls -1 "$arm_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
             fi
             echo "ARM binary: $ARM_BIN"
+            echo "ARM bundle output: $arm_bundle"
+            echo "ARM_BUNDLE=$arm_bundle" >> $GITHUB_OUTPUT
             echo "ARM_BIN=$ARM_BIN" >> $GITHUB_OUTPUT
           fi
 
       - name: "Debug: Universal preflight"
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           INTEL_BIN="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
           ARM_BIN="${{ steps.locate-arm-univ.outputs.ARM_BIN }}"
           echo "INTEL_BIN_PRE=$INTEL_BIN"
@@ -298,12 +169,10 @@ jobs:
           fi
       - name: Create Universal Binary
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           intel_bin="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
           arm_bin="${{ steps.locate-arm-univ.outputs.ARM_BIN }}"
           echo "INTEL_BIN=$intel_bin"
           echo "ARM_BIN=$arm_bin"
-          # Fallbacks if binaries were not found by earlier steps
           if [ -z "$intel_bin" ]; then
             intel_bundle=$(find build/intel -name "*.app" -type d 2>/dev/null | head -n1)
             if [ -n "$intel_bundle" ]; then
@@ -334,15 +203,29 @@ jobs:
 
       - name: Create Universal App
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
-          intel_bundle="build/intel/$APP_NAME.app"
+          intel_bundle="${{ steps.locate-intel-univ.outputs.INTEL_BUNDLE }}"
+          intel_bin="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
+          if [ -z "$intel_bundle" ]; then
+            intel_bundle=$(find build/intel -name "*.app" -type d 2>/dev/null | head -n1)
+          fi
+          if [ -z "$intel_bin" ]; then
+            if [ -f "$intel_bundle/Contents/MacOS/$APP_NAME" ]; then
+              intel_bin="$intel_bundle/Contents/MacOS/$APP_NAME"
+            else
+              intel_bin=$(ls -1 "$intel_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
+            fi
+          fi
+          if [ -z "$intel_bundle" ] || [ -z "$intel_bin" ]; then
+            echo "Unable to locate Intel bundle or executable for universal app creation"
+            exit 1
+          fi
+          intel_exec_name=$(basename "$intel_bin")
           universal_app_dir="build/universal/${APP_NAME}-universal.app"
           cp -R "$intel_bundle" "$universal_app_dir"
-          cp "build/universal/$APP_NAME-universal" "$universal_app_dir/Contents/MacOS/$APP_NAME"
+          cp "build/universal/$APP_NAME-universal" "$universal_app_dir/Contents/MacOS/$intel_exec_name"
 
       - name: Create Universal DMG
         run: |
-          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           dmg_path="artifacts/universal/${APP_NAME}-universal-macos.dmg"
           mkdir -p artifacts/universal
           hdiutil create -volname "${APP_NAME} Universal" -srcfolder "build/universal/${APP_NAME}-universal.app" -ov -format UDZO "$dmg_path"
