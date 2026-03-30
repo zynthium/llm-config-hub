@@ -103,6 +103,7 @@ jobs:
           hdiutil create -volname "${APP_NAME} Intel" -srcfolder "$intel_bin" -ov -format UDZO "$dmg_path"
 
       - name: Upload Intel artifact
+        if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/intel/*.dmg
@@ -183,6 +184,7 @@ jobs:
           hdiutil create -volname "${APP_NAME} Apple Silicon" -srcfolder "$arm_bin" -ov -format UDZO "$dmg_path"
 
       - name: Upload ARM64 artifact
+        if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/arm64/*.dmg
@@ -295,6 +297,7 @@ jobs:
           hdiutil create -volname "${APP_NAME} Universal" -srcfolder "build/universal/${APP_NAME}-universal.app" -ov -format UDZO "$dmg_path"
 
       - name: Upload Universal artifact
+        if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/universal/*.dmg
