@@ -153,6 +153,20 @@ jobs:
       - name: List bundle contents
         run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
+      - name: Locate ARM binary
+        id: locate-arm
+        run: |
+          APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
+          bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
+          echo "Looking for binary in bundle: $bundle"
+          if [ -f "$bundle/Contents/MacOS/$APP_NAME" ]; then
+            ARM_BIN="$bundle/Contents/MacOS/$APP_NAME"
+          else
+            ARM_BIN=$(ls -1 "$bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
+          fi
+          echo "Found binary: $ARM_BIN"
+          echo "ARM_BIN=$ARM_BIN" >> $GITHUB_OUTPUT
+
       - name: Upload .app bundle
         uses: actions/upload-artifact@v4
         with:
