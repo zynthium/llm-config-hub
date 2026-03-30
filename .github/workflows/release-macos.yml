@@ -268,10 +268,14 @@ jobs:
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           intel_bin="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
           arm_bin="${{ steps.locate-arm-univ.outputs.ARM_BIN }}"
-          echo "Intel binary: $intel_bin"
-          echo "ARM binary: $arm_bin"
           universal_bin="build/universal/$APP_NAME-universal"
+          echo "INTEL_BIN=$intel_bin"
+          echo "ARM_BIN=$arm_bin"
           mkdir -p build/universal
+          if [ -z "$intel_bin" ] || [ -z "$arm_bin" ]; then
+            echo "Missing binaries: INTEL_BIN='$intel_bin', ARM_BIN='$arm_bin'"
+            exit 1
+          fi
           lipo -create "$intel_bin" "$arm_bin" -o "$universal_bin"
 
       - name: Create Universal App
