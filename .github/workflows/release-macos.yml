@@ -1,4 +1,4 @@
-name: Release macOS (Intel & Apple Silicon)
+name: "Release macOS (Intel & Apple Silicon)"
 
 on:
   release:
