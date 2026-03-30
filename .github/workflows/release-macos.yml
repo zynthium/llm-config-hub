@@ -59,11 +59,20 @@ jobs:
       - name: List bundle contents
         run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
-      - name: Upload .app bundle
+      - name: Archive .app bundle
+        run: |
+          bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
+          bundle_name=$(basename "$bundle")
+          archive_dir="artifacts/${{ matrix.arch }}"
+          archive_path="$archive_dir/${bundle_name}.tar.gz"
+          mkdir -p "$archive_dir"
+          tar -czf "$archive_path" -C "$(dirname "$bundle")" "$bundle_name"
+
+      - name: Upload .app archive
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ steps.find-bundle.outputs.BUNDLE_PATH }}
+          path: artifacts/${{ matrix.arch }}/*.tar.gz
 
       - name: Create DMG
         run: |
@@ -92,15 +101,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: intel-app
-          path: build/intel
-          merge-multiple: true
+          path: build/intel-archive
 
       - name: Download ARM64 .app
         uses: actions/download-artifact@v4
         with:
           name: arm64-app
-          path: build/arm64
-          merge-multiple: true
+          path: build/arm64-archive
+
+      - name: Extract Intel .app
+        run: |
+          mkdir -p build/intel
+          tar -xzf build/intel-archive/*.tar.gz -C build/intel
+
+      - name: Extract ARM64 .app
+        run: |
+          mkdir -p build/arm64
+          tar -xzf build/arm64-archive/*.tar.gz -C build/arm64
 
       - name: List downloaded files
         run: |
