@@ -3,6 +3,7 @@ name: Release macOS (Intel & Apple Silicon)
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: write
