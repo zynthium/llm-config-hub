@@ -21,6 +21,8 @@ export interface ExportTarget {
   isRemote: boolean;
   sshCommand: string;
   bashScript: string;
+  saveAsDefaultScript?: string;
+  restoreDefaultScript?: string;
   isBuiltin?: boolean;
 }
 

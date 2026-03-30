@@ -155,7 +155,7 @@ echo "你的 BaseURL:  {{baseUrl}} （需在代理层配置，Cursor 不支持�
     ),
     (
         "codex",
-        "OpenAI Codex CLI",
+        "Codex CLI",
         false,
         r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -320,14 +320,23 @@ echo "Opencode 配置已更新: $CONFIG""#,
 
 impl SecureStore {
     pub fn new(app: tauri::AppHandle) -> Result<Self, StoreError> {
-        let mut root = app.path().app_data_dir().map_err(|e| { eprintln!("[secure_store] app_data_dir error: {:?}", e); StoreError::Crypto })?;
+        let mut root = app.path().app_data_dir().map_err(|e| {
+            eprintln!("[secure_store] app_data_dir error: {:?}", e);
+            StoreError::Crypto
+        })?;
         if !root.exists() {
             fs::create_dir_all(&root)?;
         }
         root.push("config_store.enc");
-        let key = load_or_create_master_key().map_err(|e| { eprintln!("[secure_store] master_key error: {:?}", e); e })?;
+        let key = load_or_create_master_key().map_err(|e| {
+            eprintln!("[secure_store] master_key error: {:?}", e);
+            e
+        })?;
         let mut state = if root.exists() {
-            read_encrypted(&root, &key).map_err(|e| { eprintln!("[secure_store] read_encrypted error: {:?}", e); e })?
+            read_encrypted(&root, &key).map_err(|e| {
+                eprintln!("[secure_store] read_encrypted error: {:?}", e);
+                e
+            })?
         } else {
             StoreFile::default()
         };
@@ -335,16 +344,21 @@ impl SecureStore {
         // 确保所有内置目标都存在（兼容旧数据）
         for (id, name, is_remote, script) in DEFAULT_TARGETS {
             if !state.export_targets.iter().any(|t| t.id == *id) {
-                state.export_targets.insert(0, ExportTarget {
-                    id: id.to_string(),
-                    name: name.to_string(),
-                    is_remote: *is_remote,
-                    ssh_command: String::new(),
-                    bash_script: script.to_string(),
-                    is_builtin: true,
-                });
+                state.export_targets.insert(
+                    0,
+                    ExportTarget {
+                        id: id.to_string(),
+                        name: name.to_string(),
+                        is_remote: *is_remote,
+                        ssh_command: String::new(),
+                        bash_script: script.to_string(),
+                        save_as_default_script: None,
+                        restore_default_script: None,
+                        is_builtin: true,
+                    },
+                );
             } else {
-                // 强制同步内置目标的脚本和名称，确保版本更新后脚本也随之更新
+                // 强制同步内置目标的脚本和名称，确保版本更新后脚本随之更新
                 for t in &mut state.export_targets {
                     if t.id == *id {
                         t.bash_script = script.to_string();
@@ -354,6 +368,18 @@ impl SecureStore {
                 }
             }
         }
+        // 按指定顺序重新排序内置目标
+        let target_order = ["claude-code", "codex", "gemini-cli", "opencode", "cursor"];
+        state.export_targets.sort_by(|a, b| {
+            let a_pos = target_order.iter().position(|&x| x == a.id);
+            let b_pos = target_order.iter().position(|&x| x == b.id);
+            match (a_pos, b_pos) {
+                (Some(ao), Some(bo)) => ao.cmp(&bo),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        });
         write_encrypted(&root, &key, &state)?;
         Ok(Self {
             path: root,
@@ -365,12 +391,21 @@ impl SecureStore {
     // --- ModelConfig ---
 
     pub fn list_configs(&self) -> Vec<ModelConfig> {
-        self.state.lock().expect("store lock poisoned").model_configs.clone()
+        self.state
+            .lock()
+            .expect("store lock poisoned")
+            .model_configs
+            .clone()
     }
 
     pub fn get_config(&self, id: &str) -> Option<ModelConfig> {
-        self.state.lock().expect("store lock poisoned")
-            .model_configs.iter().find(|m| m.id == id).cloned()
+        self.state
+            .lock()
+            .expect("store lock poisoned")
+            .model_configs
+            .iter()
+            .find(|m| m.id == id)
+            .cloned()
     }
 
     pub fn upsert_config(&self, input: NewModelConfig) -> Result<ModelConfig, StoreError> {
@@ -437,14 +472,22 @@ impl SecureStore {
     // --- ExportTarget ---
 
     pub fn list_targets(&self) -> Vec<ExportTarget> {
-        self.state.lock().expect("store lock poisoned").export_targets.clone()
+        self.state
+            .lock()
+            .expect("store lock poisoned")
+            .export_targets
+            .clone()
     }
 
     pub fn upsert_target(&self, input: NewExportTarget) -> Result<ExportTarget, StoreError> {
         let mut guard = self.state.lock().expect("store lock poisoned");
         // 拒绝编辑内置目标
         if let Some(id) = &input.id {
-            if guard.export_targets.iter().any(|t| &t.id == id && t.is_builtin) {
+            if guard
+                .export_targets
+                .iter()
+                .any(|t| &t.id == id && t.is_builtin)
+            {
                 return Err(StoreError::NotFound);
             }
         }
@@ -470,6 +513,8 @@ impl SecureStore {
                 is_remote: input.is_remote,
                 ssh_command: input.ssh_command,
                 bash_script: input.bash_script,
+                save_as_default_script: None,
+                restore_default_script: None,
                 is_builtin: false,
             };
             guard.export_targets.push(new_item.clone());
@@ -482,7 +527,11 @@ impl SecureStore {
     pub fn delete_target(&self, id: &str) -> Result<(), StoreError> {
         let mut guard = self.state.lock().expect("store lock poisoned");
         // 拒绝删除内置目标
-        if guard.export_targets.iter().any(|t| t.id == id && t.is_builtin) {
+        if guard
+            .export_targets
+            .iter()
+            .any(|t| t.id == id && t.is_builtin)
+        {
             return Err(StoreError::NotFound);
         }
         let old_len = guard.export_targets.len();
@@ -494,9 +543,15 @@ impl SecureStore {
         Ok(())
     }
 
-    pub fn save_model_health_cache(&self, config_id: &str, results: Vec<ModelHealthResult>) -> Result<(), StoreError> {
+    pub fn save_model_health_cache(
+        &self,
+        config_id: &str,
+        results: Vec<ModelHealthResult>,
+    ) -> Result<(), StoreError> {
         let mut guard = self.state.lock().expect("store lock poisoned");
-        guard.model_health_cache.insert(config_id.to_string(), results);
+        guard
+            .model_health_cache
+            .insert(config_id.to_string(), results);
         write_encrypted(&self.path, &self.key, &guard)?;
         Ok(())
     }
@@ -532,7 +587,8 @@ fn load_or_create_master_key() -> Result<[u8; 32], StoreError> {
             if let Some(old_val) = migrated {
                 eprintln!("[keyring] migrating from ai-key-manager");
                 entry.set_password(&old_val)?;
-                let _ = keyring::Entry::new("ai-key-manager", "master-key").map(|e| e.delete_credential());
+                let _ = keyring::Entry::new("ai-key-manager", "master-key")
+                    .map(|e| e.delete_credential());
                 old_val
             } else {
                 eprintln!("[keyring] generating new master key");
@@ -576,7 +632,11 @@ fn write_encrypted(path: &PathBuf, key: &[u8; 32], store: &StoreFile) -> Result<
     let encrypted = cipher
         .encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_ref())
         .map_err(|_| StoreError::Crypto)?;
-    let data = format!("{}.{}", BASE64.encode(nonce_bytes), BASE64.encode(encrypted));
+    let data = format!(
+        "{}.{}",
+        BASE64.encode(nonce_bytes),
+        BASE64.encode(encrypted)
+    );
     fs::write(path, data)?;
     Ok(())
 }

@@ -1,15 +1,22 @@
 import { useState } from 'react';
-import { X, Copy, Check, Server, Monitor, Play, ChevronDown, ChevronRight, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { X, Copy, Check, Play, ChevronDown, ChevronRight, Loader2, CheckCircle2, XCircle, Bookmark, RotateCcw } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from './ui/Button';
 import { LLMConfig, ExportTarget } from '../types';
+import TargetIcon from './TargetIcon';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-bash';
+import 'prismjs/themes/prism-tomorrow.css';
 
 export default function DeployModal({ config, targets, onClose }: { config: LLMConfig, targets: ExportTarget[], onClose: () => void }) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [confirmTarget, setConfirmTarget] = useState<ExportTarget | null>(null);
+  const [confirmSaveTarget, setConfirmSaveTarget] = useState<ExportTarget | null>(null);
+  const [confirmRestoreTarget, setConfirmRestoreTarget] = useState<ExportTarget | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runResult, setRunResult] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [activeTabs, setActiveTabs] = useState<Record<string, 'deploy' | 'save' | 'restore'>>({});
 
   const getSnippet = (target: ExportTarget) => {
     const { baseUrl, apiKey, models, defaultModel } = config;
@@ -42,9 +49,73 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
     setRunResult(prev => { const next = { ...prev }; delete next[target.id]; return next; });
     try {
       const output = await invoke<string>('run_bash_script', { script: getSnippet(target) });
-      setRunResult(prev => ({ ...prev, [target.id]: { ok: true, message: output || '执行成功' } }));
+      setRunResult(prev => ({ ...prev, [target.id]: { ok: true, message: output || 'Execution successful' } }));
     } catch (err) {
       setRunResult(prev => ({ ...prev, [target.id]: { ok: false, message: String(err) } }));
+    } finally {
+      setRunningId(null);
+    }
+  };
+
+  const getSaveDefaultSnippet = (target: ExportTarget) => {
+    if (!target.saveAsDefaultScript) return null;
+    const { baseUrl, apiKey, models, defaultModel } = config;
+    let script = target.saveAsDefaultScript
+      .replace(/\{\{apiKey\}\}/g, apiKey)
+      .replace(/\{\{baseUrl\}\}/g, baseUrl)
+      .replace(/\{\{models\}\}/g, models || '');
+    script = script.replace(/\{\{defaultModel\}\}/g, defaultModel || '');
+
+    if (target.isRemote && target.sshCommand) {
+      const escapedScript = script.replace(/'/g, "'\\''" );
+      return `${target.sshCommand} '${escapedScript}'`;
+    }
+    return script;
+  };
+
+  const getRestoreDefaultSnippet = (target: ExportTarget) => {
+    if (!target.restoreDefaultScript) return null;
+    const { baseUrl, apiKey, models, defaultModel } = config;
+    let script = target.restoreDefaultScript
+      .replace(/\{\{apiKey\}\}/g, apiKey)
+      .replace(/\{\{baseUrl\}\}/g, baseUrl)
+      .replace(/\{\{models\}\}/g, models || '');
+    script = script.replace(/\{\{defaultModel\}\}/g, defaultModel || '');
+
+    if (target.isRemote && target.sshCommand) {
+      const escapedScript = script.replace(/'/g, "'\\''" );
+      return `${target.sshCommand} '${escapedScript}'`;
+    }
+    return script;
+  };
+
+  const handleSaveAsDefault = async (target: ExportTarget) => {
+    setConfirmSaveTarget(null);
+    const script = getSaveDefaultSnippet(target);
+    if (!script) return;
+    setRunningId(target.id + '-save');
+    setRunResult(prev => { const next = { ...prev }; delete next[target.id + '-save']; return next; });
+    try {
+      const output = await invoke<string>('run_bash_script', { script });
+      setRunResult(prev => ({ ...prev, [target.id + '-save']: { ok: true, message: output || 'Saved as default successfully' } }));
+    } catch (err) {
+      setRunResult(prev => ({ ...prev, [target.id + '-save']: { ok: false, message: String(err) } }));
+    } finally {
+      setRunningId(null);
+    }
+  };
+
+  const handleRestoreDefault = async (target: ExportTarget) => {
+    setConfirmRestoreTarget(null);
+    const script = getRestoreDefaultSnippet(target);
+    if (!script) return;
+    setRunningId(target.id + '-restore');
+    setRunResult(prev => { const next = { ...prev }; delete next[target.id + '-restore']; return next; });
+    try {
+      const output = await invoke<string>('run_bash_script', { script });
+      setRunResult(prev => ({ ...prev, [target.id + '-restore']: { ok: true, message: output || 'Restored default successfully' } }));
+    } catch (err) {
+      setRunResult(prev => ({ ...prev, [target.id + '-restore']: { ok: false, message: String(err) } }));
     } finally {
       setRunningId(null);
     }
@@ -73,7 +144,7 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
           {targets.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-xs text-gray-500">No import targets available.</p>
-              <p className="text-xs text-gray-400 mt-1">Please add targets in the "Import Targets" tab first.</p>
+               <p className="text-xs text-gray-400 mt-1">Please add targets in the &quot;Import Targets&quot; tab first.</p>
             </div>
           ) : (
             targets.map(target => (
@@ -88,12 +159,12 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
                     {expandedIds[target.id]
                       ? <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                       : <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
-                    <div className={`p-1.5 rounded-md flex-shrink-0 ${target.isRemote ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}`}>
-                      {target.isRemote ? <Server className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+                    <div className="w-8 h-8 rounded-md flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                      <TargetIcon targetId={target.id} isBuiltin={target.isBuiltin} isRemote={target.isRemote} className="w-6 h-6" />
                     </div>
                     <div className="text-left min-w-0">
                       <h3 className="text-xs font-semibold text-gray-900">{target.name}</h3>
-                      <span className={`text-xs ${target.isRemote ? 'text-purple-500' : 'text-green-500'}`}>
+                      <span className="text-xs text-gray-500">
                         {target.isRemote ? 'Remote (SSH)' : 'Local Machine'}
                       </span>
                     </div>
@@ -122,6 +193,36 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
                         : <Play className="w-3.5 h-3.5" />}
                       Run
                     </Button>
+                    {target.saveAsDefaultScript && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConfirmSaveTarget(target)}
+                        disabled={runningId === target.id + '-save'}
+                        className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                        title="Save current config as default"
+                      >
+                        {runningId === target.id + '-save'
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Bookmark className="w-3.5 h-3.5" />}
+                        Save
+                      </Button>
+                    )}
+                    {target.restoreDefaultScript && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConfirmRestoreTarget(target)}
+                        disabled={runningId === target.id + '-restore'}
+                        className="border-green-200 text-green-600 hover:bg-green-50"
+                        title="Restore to default config"
+                      >
+                        {runningId === target.id + '-restore'
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <RotateCcw className="w-3.5 h-3.5" />}
+                        Restore
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -139,14 +240,46 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
                   </div>
                 )}
 
-                {/* Script block */}
-                {expandedIds[target.id] && (
-                  <div className="px-3 py-2.5 bg-gray-900 border-t border-gray-700">
-                    <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap break-all leading-relaxed">
-                      {getSnippet(target)}
-                    </pre>
-                  </div>
-                )}
+                 {/* Script block */}
+                 {expandedIds[target.id] && (
+                   <div className="px-3 py-2.5 bg-gray-900 border-t border-gray-700">
+                     <div className="flex flex-wrap border-b border-gray-700 mb-1">
+                        <button
+                          className={'px-3 py-1.5 text-xs font-medium ' + (activeTabs[target.id] === 'deploy' || !activeTabs[target.id] ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400 hover:text-gray-300')}
+                          onClick={() => setActiveTabs(prev => ({ ...prev, [target.id]: 'deploy' }))}
+                        >
+                          Deploy Script
+                        </button>
+                        {target.saveAsDefaultScript && (
+                          <button
+                            className={'px-3 py-1.5 text-xs font-medium ' + (activeTabs[target.id] === 'save' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-300')}
+                            onClick={() => setActiveTabs(prev => ({ ...prev, [target.id]: 'save' }))}
+                          >
+                            Save Default Script
+                          </button>
+                        )}
+                        {target.restoreDefaultScript && (
+                          <button
+                            className={'px-3 py-1.5 text-xs font-medium ' + (activeTabs[target.id] === 'restore' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400 hover:text-gray-300')}
+                            onClick={() => setActiveTabs(prev => ({ ...prev, [target.id]: 'restore' }))}
+                          >
+                            Restore Default Script
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: (() => {
+                            const script = (activeTabs[target.id] === 'deploy' || !activeTabs[target.id]) ? getSnippet(target) :
+                              activeTabs[target.id] === 'save' ? getSaveDefaultSnippet(target) || '' :
+                              activeTabs[target.id] === 'restore' ? getRestoreDefaultSnippet(target) || '' : '';
+                            return Prism.highlight(script, Prism.languages.bash || {}, 'bash');
+                          })()
+                        }}
+                      />
+                    </div>
+                 )}
 
               </div>
             ))
@@ -159,19 +292,65 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
       {confirmTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">确认运行脚本</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Confirm Run Script</h3>
             <p className="text-xs text-gray-500 mb-4">
-              即将在 <span className="font-medium text-gray-700">{confirmTarget.name}</span> 上执行部署脚本，此操作会修改系统环境变量，确认继续？
+              This will execute the deployment script on <span className="font-medium text-gray-700">{confirmTarget.name}</span>. This will modify system environment variables. Continue?
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirmTarget(null)}>取消</Button>
+              <Button variant="outline" size="sm" onClick={() => setConfirmTarget(null)}>Cancel</Button>
               <Button
                 size="sm"
                 onClick={() => handleRun(confirmTarget)}
                 className="bg-orange-600 hover:bg-orange-700 text-white"
               >
                 <Play className="w-3.5 h-3.5" />
-                确认运行
+                Confirm Run
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Save dialog */}
+      {confirmSaveTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Confirm Save as Default</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              This will save the current config as default on <span className="font-medium text-gray-700">{confirmSaveTarget.name}</span>. Continue?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmSaveTarget(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                onClick={() => handleSaveAsDefault(confirmSaveTarget)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                Confirm Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Restore dialog */}
+      {confirmRestoreTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Confirm Restore Default</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              This will restore default config on <span className="font-medium text-gray-700">{confirmRestoreTarget.name}</span>. Continue?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmRestoreTarget(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                onClick={() => handleRestoreDefault(confirmRestoreTarget)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Confirm Restore
               </Button>
             </div>
           </div>

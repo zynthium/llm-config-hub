@@ -189,7 +189,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
                 <button
                   onClick={() => navigator.clipboard.writeText(r.model)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-700"
-                  title="复制模型名称"
+                  title="Copy model name"
                 >
                   <Copy className="w-3 h-3" />
                 </button>
@@ -227,7 +227,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
               onClick={retestAll}
               disabled={isRetestingAll}
               className="text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="重新测试所有连通性"
+              title="Retest all connectivity"
             >
               <RefreshCw className={`w-3 h-3 ${isRetestingAll ? 'animate-spin' : ''}`} />
             </button>
@@ -403,7 +403,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
                             <button
                               onClick={() => navigator.clipboard.writeText(r.model)}
                               className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-700"
-                              title="复制模型名称"
+                  title="Copy model name"
                             >
                               <Copy className="w-3 h-3" />
                             </button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Server, Monitor, Save, Terminal, Code, Lock } from 'lucide-react';
+import { Plus, Trash2, Server, Monitor, Save, Terminal, Code, Lock, Bookmark, RotateCcw } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { ExportTarget } from '../types';
@@ -8,6 +8,7 @@ import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-bash';
 import 'prismjs/themes/prism-tomorrow.css';
+import TargetIcon from './TargetIcon';
 
 export default function TargetManager({ targets, addTarget, updateTarget, deleteTarget }: any) {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
@@ -18,7 +19,9 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
     name: '',
     isRemote: false,
     sshCommand: 'ssh user@remote-host',
-    bashScript: 'echo \'export OPENAI_API_KEY="{{apiKey}}"\' >> ~/.bashrc\necho \'export OPENAI_BASE_URL="{{baseUrl}}"\' >> ~/.bashrc'
+    bashScript: 'echo \'export OPENAI_API_KEY="{{apiKey}}"\' >> ~/.bashrc\necho \'export OPENAI_BASE_URL="{{baseUrl}}"\' >> ~/.bashrc',
+    saveAsDefaultScript: '',
+    restoreDefaultScript: ''
   });
 
   // Initialize selection
@@ -39,7 +42,9 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
           name: target.name,
           isRemote: target.isRemote,
           sshCommand: target.sshCommand || 'ssh user@remote-host',
-          bashScript: target.bashScript
+          bashScript: target.bashScript,
+          saveAsDefaultScript: target.saveAsDefaultScript || '',
+          restoreDefaultScript: target.restoreDefaultScript || ''
         });
       }
     }
@@ -52,7 +57,9 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
       name: '',
       isRemote: false,
       sshCommand: 'ssh user@remote-host',
-      bashScript: 'echo \'export OPENAI_API_KEY="{{apiKey}}"\' >> ~/.bashrc\necho \'export OPENAI_BASE_URL="{{baseUrl}}"\' >> ~/.bashrc'
+      bashScript: 'echo \'export OPENAI_API_KEY="{{apiKey}}"\' >> ~/.bashrc\necho \'export OPENAI_BASE_URL="{{baseUrl}}"\' >> ~/.bashrc',
+      saveAsDefaultScript: '',
+      restoreDefaultScript: ''
     });
   };
 
@@ -112,8 +119,8 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
                   }`}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <div className={`p-1.5 rounded-md flex-shrink-0 ${target.isRemote ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}`}>
-                      {target.isRemote ? <Server className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+                    <div className="w-8 h-8 rounded-md flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                      <TargetIcon targetId={target.id} isBuiltin={target.isBuiltin} isRemote={target.isRemote} className="w-6 h-6" />
                     </div>
                     <div className="truncate text-left">
                       <div className={`text-sm font-medium truncate ${selectedTargetId === target.id && !isCreating ? 'text-blue-900' : 'text-gray-900'}`}>
@@ -125,7 +132,7 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
                     </div>
                   </div>
                   {target.isBuiltin ? (
-                    <span className="p-1.5 text-gray-300 flex-shrink-0" title="内置目标，不可删除">
+                    <span className="p-1.5 text-gray-300 flex-shrink-0" title="Built-in target, cannot delete">
                       <Lock className="w-3.5 h-3.5" />
                     </span>
                   ) : (
@@ -249,6 +256,76 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
                         fontFamily: '"JetBrains Mono", "Fira Code", monospace',
                         fontSize: 12,
                         minHeight: '200px',
+                        backgroundColor: 'transparent',
+                        color: '#f8f8f2',
+                        opacity: isReadonly ? 0.7 : 1,
+                      }}
+                      className="editor-container"
+                      textareaClassName="focus:outline-none"
+                      readOnly={isReadonly}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <label className="block text-xs font-semibold text-gray-900">Save as Default Script</label>
+                  <div className="flex gap-2">
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-blue-600 text-xs font-mono">{'{{apiKey}}'}</code>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-blue-600 text-xs font-mono">{'{{baseUrl}}'}</code>
+                  </div>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-gray-800 shadow-sm bg-[#2d2d2d] flex flex-col">
+                  <div className="bg-gray-800 px-3 py-1.5 border-b border-gray-700 flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-mono text-gray-400">save_default.sh</span>
+                  </div>
+                  <div className="min-h-[120px]">
+                    <Editor
+                      value={formData.saveAsDefaultScript}
+                      onValueChange={code => !isReadonly && setFormData({ ...formData, saveAsDefaultScript: code })}
+                      highlight={code => Prism.highlight(code, Prism.languages.bash || {}, 'bash')}
+                      padding={16}
+                      style={{
+                        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                        fontSize: 12,
+                        minHeight: '120px',
+                        backgroundColor: 'transparent',
+                        color: '#f8f8f2',
+                        opacity: isReadonly ? 0.7 : 1,
+                      }}
+                      className="editor-container"
+                      textareaClassName="focus:outline-none"
+                      readOnly={isReadonly}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <label className="block text-xs font-semibold text-gray-900">Restore Default Script</label>
+                  <div className="flex gap-2">
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-blue-600 text-xs font-mono">{'{{apiKey}}'}</code>
+                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-blue-600 text-xs font-mono">{'{{baseUrl}}'}</code>
+                  </div>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-gray-800 shadow-sm bg-[#2d2d2d] flex flex-col">
+                  <div className="bg-gray-800 px-3 py-1.5 border-b border-gray-700 flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-mono text-gray-400">restore_default.sh</span>
+                  </div>
+                  <div className="min-h-[120px]">
+                    <Editor
+                      value={formData.restoreDefaultScript}
+                      onValueChange={code => !isReadonly && setFormData({ ...formData, restoreDefaultScript: code })}
+                      highlight={code => Prism.highlight(code, Prism.languages.bash || {}, 'bash')}
+                      padding={16}
+                      style={{
+                        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                        fontSize: 12,
+                        minHeight: '120px',
                         backgroundColor: 'transparent',
                         color: '#f8f8f2',
                         opacity: isReadonly ? 0.7 : 1,

@@ -45,6 +45,8 @@ pub struct ExportTarget {
     pub is_remote: bool,
     pub ssh_command: String,
     pub bash_script: String,
+    pub save_as_default_script: Option<String>,
+    pub restore_default_script: Option<String>,
     #[serde(default)]
     pub is_builtin: bool,
 }
@@ -57,6 +59,8 @@ pub struct NewExportTarget {
     pub is_remote: bool,
     pub ssh_command: String,
     pub bash_script: String,
+    pub save_as_default_script: Option<String>,
+    pub restore_default_script: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

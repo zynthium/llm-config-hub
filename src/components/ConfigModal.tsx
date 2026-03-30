@@ -167,7 +167,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
     setError(null);
 
     if (!formData.billingType) {
-      setError('请选择 Billing Type。');
+      setError('Please select Billing Type.');
       return;
     }
 
@@ -177,7 +177,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
     );
 
     if (isDuplicate) {
-      setError('该 Base URL + API Key 组合已存在。');
+      setError('This Base URL + API Key combination already exists.');
       return;
     }
 
@@ -223,7 +223,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
                   className="border-blue-300 text-blue-700 hover:bg-blue-100"
                 >
                   <Clipboard className="w-3.5 h-3.5" />
-                  从剪贴板填充
+                  Fill from clipboard
                 </Button>
                 <Button
                   type="button"
@@ -253,7 +253,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
                   type="button"
                   onClick={handleAutoFillName}
                   disabled={!formData.baseUrl}
-                  title="根据域名自动填充名称"
+                  title="Auto-fill name from domain"
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
@@ -325,7 +325,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
                 <label className="block text-xs font-medium text-gray-700 mb-1">Billing Type</label>
                 <Select key={formData.billingType} value={formData.billingType || undefined} onValueChange={val => setFormData({ ...formData, billingType: val as 'free' | 'paid' })}>
                   <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder="请选择" />
+                    <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="free">Free</SelectItem>
@@ -346,12 +346,13 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">备注 (Optional)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Notes (Optional)</label>
               <Textarea
                 value={formData.notes}
                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Add any notes about this configuration..."
-                className="h-16 text-xs"
+                className="text-xs min-h-[60px]"
+                autoResize
               />
             </div>
 
