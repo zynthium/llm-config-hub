@@ -271,12 +271,33 @@ jobs:
           APP_NAME="${{ steps.appname.outputs.APP_NAME }}"
           intel_bin="${{ steps.locate-intel-univ.outputs.INTEL_BIN }}"
           arm_bin="${{ steps.locate-arm-univ.outputs.ARM_BIN }}"
-          universal_bin="build/universal/$APP_NAME-universal"
           echo "INTEL_BIN=$intel_bin"
           echo "ARM_BIN=$arm_bin"
+          # Fallbacks if binaries were not found by earlier steps
+          if [ -z "$intel_bin" ]; then
+            intel_bundle=$(find build/intel -name "*.app" -type d 2>/dev/null | head -n1)
+            if [ -n "$intel_bundle" ]; then
+              if [ -f "$intel_bundle/Contents/MacOS/$APP_NAME" ]; then
+                intel_bin="$intel_bundle/Contents/MacOS/$APP_NAME"
+              else
+                intel_bin=$(ls -1 "$intel_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
+              fi
+            fi
+          fi
+          if [ -z "$arm_bin" ]; then
+            arm_bundle=$(find build/arm64 -name "*.app" -type d 2>/dev/null | head -n1)
+            if [ -n "$arm_bundle" ]; then
+              if [ -f "$arm_bundle/Contents/MacOS/$APP_NAME" ]; then
+                arm_bin="$arm_bundle/Contents/MacOS/$APP_NAME"
+              else
+                arm_bin=$(ls -1 "$arm_bundle/Contents/MacOS/"* 2>/dev/null | head -n1)
+              fi
+            fi
+          fi
+          universal_bin="build/universal/$APP_NAME-universal"
           mkdir -p build/universal
           if [ -z "$intel_bin" ] || [ -z "$arm_bin" ]; then
-            echo "Missing binaries: INTEL_BIN='$intel_bin', ARM_BIN='$arm_bin'"
+            echo "Missing binaries after fallback: INTEL_BIN='$intel_bin', ARM_BIN='$arm_bin'"
             exit 1
           fi
           lipo -create "$intel_bin" "$arm_bin" -o "$universal_bin"
