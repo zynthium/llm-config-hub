@@ -23,6 +23,7 @@ pub async fn test_connection(
         headers: None,
         tags: None,
         billing_type: None,
+        notes: None,
         status: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -82,6 +83,7 @@ pub async fn probe_models_adhoc(
         headers: None,
         tags: None,
         billing_type: None,
+        notes: None,
         status: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -113,4 +115,3 @@ pub fn remove_model_health_cache(
 ) -> Result<(), String> {
     store.remove_model_health_cache(&config_id).map_err(|e| e.to_string())
 }
-

@@ -389,6 +389,7 @@ impl SecureStore {
                     config.headers = input.headers.clone();
                     config.tags = input.tags.clone();
                     config.billing_type = input.billing_type.clone();
+                    config.notes = input.notes.clone();
                     config.status = input.status.clone();
                     config.updated_at = now;
                     saved = Some(config.clone());
@@ -410,6 +411,7 @@ impl SecureStore {
                 headers: input.headers,
                 tags: input.tags,
                 billing_type: input.billing_type,
+                notes: input.notes,
                 status: input.status,
                 created_at: now,
                 updated_at: now,

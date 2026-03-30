@@ -355,12 +355,6 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
               />
             </div>
 
-            {error && (
-              <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
             <div className="pt-2 space-y-2">
               <div className="flex gap-2">
                 <Button
@@ -459,24 +453,31 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
           </form>
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex gap-3 flex-shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="flex-1"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="config-form"
-            size="sm"
-            className="flex-1"
-          >
-            {config ? 'Save Changes' : 'Add Configuration'}
-          </Button>
+        <div className="p-5 border-t border-gray-100 flex flex-col gap-3 flex-shrink-0">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="config-form"
+              size="sm"
+              className="flex-1"
+            >
+              {config ? 'Save Changes' : 'Add Configuration'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

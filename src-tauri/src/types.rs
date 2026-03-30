@@ -14,6 +14,7 @@ pub struct ModelConfig {
     pub headers: Option<serde_json::Value>,
     pub tags: Option<Vec<String>>,
     pub billing_type: Option<String>,
+    pub notes: Option<String>,
     pub status: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -32,6 +33,7 @@ pub struct NewModelConfig {
     pub headers: Option<serde_json::Value>,
     pub tags: Option<Vec<String>>,
     pub billing_type: Option<String>,
+    pub notes: Option<String>,
     pub status: Option<String>,
 }
 
