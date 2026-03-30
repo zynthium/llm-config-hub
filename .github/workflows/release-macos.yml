@@ -44,8 +44,12 @@ jobs:
       - name: Find bundle path
         id: find-bundle
         run: |
+          find src-tauri/target -name "*.app" -type d 2>/dev/null
           BUNDLE_PATH=$(find src-tauri/target -name "*.app" -type d 2>/dev/null | head -n1)
           echo "BUNDLE_PATH=$BUNDLE_PATH" >> $GITHUB_OUTPUT
+
+      - name: List bundle contents
+        run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
       - name: Upload .app bundle
         uses: actions/upload-artifact@v4
@@ -106,8 +110,12 @@ jobs:
       - name: Find bundle path
         id: find-bundle
         run: |
+          find src-tauri/target -name "*.app" -type d 2>/dev/null
           BUNDLE_PATH=$(find src-tauri/target -name "*.app" -type d 2>/dev/null | head -n1)
           echo "BUNDLE_PATH=$BUNDLE_PATH" >> $GITHUB_OUTPUT
+
+      - name: List bundle contents
+        run: ls -la "${{ steps.find-bundle.outputs.BUNDLE_PATH }}/Contents/MacOS/"
 
       - name: Upload .app bundle
         uses: actions/upload-artifact@v4
