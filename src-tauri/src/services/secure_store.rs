@@ -13,7 +13,10 @@ use tauri::Manager;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::types::{ExportTarget, ModelConfig, ModelHealthResult, NewExportTarget, NewModelConfig};
+use crate::{
+    templates::BuiltinTargetTemplate,
+    types::{ExportTarget, ModelConfig, ModelHealthResult, NewExportTarget, NewModelConfig},
+};
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -53,273 +56,11 @@ pub struct SecureStore {
     state: Mutex<StoreFile>,
 }
 
-const DEFAULT_TARGETS: &[(&str, &str, bool, &str)] = &[
-    (
-        "claude-code",
-        "Claude Code",
-        false,
-        r#"#!/usr/bin/env bash
-set -euo pipefail
-CONFIG="$HOME/.claude/settings.json"
-CONFIG_DIR="$(dirname "$CONFIG")"
-BAK_PREFIX="settings.bak."
-mkdir -p "$CONFIG_DIR"
-
-# 备份函数：仅当不存在内容相同的备份时才创建新备份
-do_backup() {
-  local src="$1" dir="$2" prefix="$3"
-  local src_hash
-  src_hash="$(shasum -a 256 "$src" 2>/dev/null | awk '{print $1}' || md5sum "$src" 2>/dev/null | awk '{print $1}')"
-  for bak in "$dir/${prefix}"*; do
-    [ -f "$bak" ] || continue
-    local bak_hash
-    bak_hash="$(shasum -a 256 "$bak" 2>/dev/null | awk '{print $1}' || md5sum "$bak" 2>/dev/null | awk '{print $1}')"
-    [ "$src_hash" = "$bak_hash" ] && return 0
-  done
-  local dst="$dir/${prefix}$(date +%s)"
-  cp "$src" "$dst"
-  echo "已备份至: $dst"
-}
-
-if [ -f "$CONFIG" ]; then
-  do_backup "$CONFIG" "$CONFIG_DIR" "$BAK_PREFIX"
-fi
-
-# 保留已有字段，仅覆盖 env 中的 API 相关字段
-if command -v python3 &>/dev/null; then
-  python3 - <<'PYEOF'
-import json, os
-p = os.path.expanduser('~/.claude/settings.json')
-data = {}
-if os.path.exists(p):
-    try:
-        with open(p, encoding='utf-8') as f:
-            data = json.load(f)
-    except Exception:
-        pass
-env = data.setdefault('env', {})
-default_model = "{{defaultModel}}".strip()
-env['ANTHROPIC_AUTH_TOKEN'] = '{{apiKey}}'
-env['ANTHROPIC_BASE_URL'] = '{{baseUrl}}'
-env['CLAUDE_CODE_MAX_OUTPUT_TOKENS'] = '32000'
-env['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] = '1'
-if default_model:
-    env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = default_model
-    env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = default_model
-    env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = default_model
-    env['ANTHROPIC_MODEL'] = default_model
-with open(p, 'w', encoding='utf-8') as f:
-    json.dump(data, f, indent=2, ensure_ascii=False)
-PYEOF
-else
-  DEFAULT_MODEL="{{defaultModel}}"
-  if [ -n "${DEFAULT_MODEL}" ]; then
-    echo '{"env":{"ANTHROPIC_AUTH_TOKEN":"{{apiKey}}","ANTHROPIC_BASE_URL":"{{baseUrl}}","ANTHROPIC_DEFAULT_HAIKU_MODEL":"{{defaultModel}}","ANTHROPIC_DEFAULT_SONNET_MODEL":"{{defaultModel}}","ANTHROPIC_DEFAULT_OPUS_MODEL":"{{defaultModel}}","ANTHROPIC_MODEL":"{{defaultModel}}","CLAUDE_CODE_MAX_OUTPUT_TOKENS":"32000","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"1"}}' > "$CONFIG"
-  else
-    echo '{"env":{"ANTHROPIC_AUTH_TOKEN":"{{apiKey}}","ANTHROPIC_BASE_URL":"{{baseUrl}}","CLAUDE_CODE_MAX_OUTPUT_TOKENS":"32000","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"1"}}' > "$CONFIG"
-  fi
-fi
-echo "Claude Code 配置已更新: $CONFIG""#,
-    ),
-    (
-        "cursor",
-        "Cursor",
-        false,
-        r#"#!/usr/bin/env bash
-set -euo pipefail
-# Cursor 不支持通过配置文件设置自定义 API BaseURL
-# 官方仅支持在 Cursor Settings -> Models 界面手动填写 API Key
-# 此脚本将 API Key 写入环境变量供参考，并打印操作指引
-SHELL_RC="$HOME/.zshrc"
-[ -f "$HOME/.bashrc" ] && SHELL_RC="$HOME/.bashrc"
-
-# 移除旧条目避免重复
-if [ -f "$SHELL_RC" ]; then
-  sed -i.bak '/# cursor api override/d' "$SHELL_RC"
-  sed -i.bak '/export OPENAI_API_KEY=.*cursor/d' "$SHELL_RC"
-  sed -i.bak '/export ANTHROPIC_API_KEY=.*cursor/d' "$SHELL_RC"
-fi
-
-echo ''
-echo '========================================'
-echo 'Cursor 不支持通过配置文件设置自定义 BaseURL'
-echo '请手动在 Cursor 中完成以下配置：'
-echo '  1. 打开 Cursor -> Settings -> Models'
-echo '  2. 在 OpenAI API Key 处填写你的 API Key：{{apiKey}}'
-echo '  3. 若使用 Azure/Bedrock，在对应区域填写 Endpoint'
-echo '  4. 自定义 BaseURL 需使用 OpenAI-compatible 代理'
-echo '========================================'
-echo ''
-echo "你的 API Key: {{apiKey}}"
-echo "你的 BaseURL:  {{baseUrl}} （需在代理层配置，Cursor 不支持直接设置）""#,
-    ),
-    (
-        "codex",
-        "Codex CLI",
-        false,
-        r#"#!/usr/bin/env bash
-set -euo pipefail
-CODEX_DIR="$HOME/.codex"
-CONFIG="$CODEX_DIR/config.toml"
-AUTH="$CODEX_DIR/auth.json"
-mkdir -p "$CODEX_DIR"
-
-# 备份函数：仅当不存在内容相同的备份时才创建新备份
-do_backup() {
-  local src="$1" dir="$2" prefix="$3"
-  local src_hash
-  src_hash="$(shasum -a 256 "$src" 2>/dev/null | awk '{print $1}' || md5sum "$src" 2>/dev/null | awk '{print $1}')"
-  for bak in "$dir/${prefix}"*; do
-    [ -f "$bak" ] || continue
-    local bak_hash
-    bak_hash="$(shasum -a 256 "$bak" 2>/dev/null | awk '{print $1}' || md5sum "$bak" 2>/dev/null | awk '{print $1}')"
-    [ "$src_hash" = "$bak_hash" ] && return 0
-  done
-  local dst="$dir/${prefix}$(date +%s)"
-  cp "$src" "$dst"
-  echo "已备份至: $dst"
-}
-
-[ -f "$CONFIG" ] && do_backup "$CONFIG" "$CODEX_DIR" "config.toml.bak."
-[ -f "$AUTH" ] && do_backup "$AUTH" "$CODEX_DIR" "auth.json.bak."
-
-# 写入 config.toml
-cat > "$CONFIG" <<EOF
-model_provider = "custom"
-model = "{{defaultModel}}"
-model_reasoning_effort = "high"
-network_access = "enabled"
-disable_response_storage = true
-
-[model_providers.custom]
-name = "custom"
-base_url = "{{baseUrl}}"
-wire_api = "responses"
-requires_openai_auth = true
-EOF
-
-# 写入 auth.json
-cat > "$AUTH" <<EOF
-{
-  "OPENAI_API_KEY": "{{apiKey}}"
-}
-EOF
-
-echo "Codex CLI 配置已更新:"
-echo "  $CONFIG"
-echo "  $AUTH""#,
-    ),
-    (
-        "gemini-cli",
-        "Gemini CLI",
-        false,
-        r#"#!/usr/bin/env bash
-set -euo pipefail
-
-# Gemini CLI 通过环境变量 GEMINI_API_KEY 认证，不支持自定义 baseURL
-# 根据用户默认 shell 选择 profile 文件
-USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
-SHELL_RC="$HOME/.profile"
-case "$USER_SHELL" in
-  zsh)  SHELL_RC="$HOME/.zshrc" ;;
-  bash) SHELL_RC="$HOME/.bashrc" ;;
-  fish) SHELL_RC="$HOME/.config/fish/config.fish" ;;
-esac
-
-BAK_PREFIX="$(basename "$SHELL_RC").gemini.bak."
-BAK_DIR="$(dirname "$SHELL_RC")"
-
-# 备份函数：仅当不存在内容相同的备份时才创建新备份
-do_backup() {
-  local src="$1" dir="$2" prefix="$3"
-  [ -f "$src" ] || return 0
-  local src_hash
-  src_hash="$(shasum -a 256 "$src" 2>/dev/null | awk '{print $1}' || md5sum "$src" 2>/dev/null | awk '{print $1}')"
-  for bak in "$dir/${prefix}"*; do
-    [ -f "$bak" ] || continue
-    local bak_hash
-    bak_hash="$(shasum -a 256 "$bak" 2>/dev/null | awk '{print $1}' || md5sum "$bak" 2>/dev/null | awk '{print $1}')"
-    [ "$src_hash" = "$bak_hash" ] && return 0
-  done
-  local dst="$dir/${prefix}$(date +%s)"
-  cp "$src" "$dst"
-  echo "已备份至: $dst"
-}
-
-do_backup "$SHELL_RC" "$BAK_DIR" "$BAK_PREFIX"
-
-# 移除旧的 GEMINI_API_KEY 设置
-if [ -f "$SHELL_RC" ]; then
-  sed -i.tmp '/# gemini-cli GEMINI_API_KEY/d' "$SHELL_RC"
-  sed -i.tmp '/export GEMINI_API_KEY=/d' "$SHELL_RC"
-  rm -f "${SHELL_RC}.tmp"
-fi
-
-# 写入新的 GEMINI_API_KEY
-echo '# gemini-cli GEMINI_API_KEY' >> "$SHELL_RC"
-echo 'export GEMINI_API_KEY="{{apiKey}}"' >> "$SHELL_RC"
-
-echo "Gemini CLI 配置已更新: $SHELL_RC"
-echo "请重新加载 shell 或运行: source $SHELL_RC""#,
-    ),
-    (
-        "opencode",
-        "Opencode",
-        false,
-        r#"#!/usr/bin/env bash
-set -euo pipefail
-CONFIG="$HOME/.config/opencode/opencode.json"
-CONFIG_DIR="$(dirname "$CONFIG")"
-BAK_PREFIX="opencode.bak."
-mkdir -p "$CONFIG_DIR"
-
-# 备份函数：仅当不存在内容相同的备份时才创建新备份
-do_backup() {
-  local src="$1" dir="$2" prefix="$3"
-  local src_hash
-  src_hash="$(shasum -a 256 "$src" 2>/dev/null | awk '{print $1}' || md5sum "$src" 2>/dev/null | awk '{print $1}')"
-  for bak in "$dir/${prefix}"*; do
-    [ -f "$bak" ] || continue
-    local bak_hash
-    bak_hash="$(shasum -a 256 "$bak" 2>/dev/null | awk '{print $1}' || md5sum "$bak" 2>/dev/null | awk '{print $1}')"
-    [ "$src_hash" = "$bak_hash" ] && return 0
-  done
-  local dst="$dir/${prefix}$(date +%s)"
-  cp "$src" "$dst"
-  echo "已备份至: $dst"
-}
-
-if [ -f "$CONFIG" ]; then
-  do_backup "$CONFIG" "$CONFIG_DIR" "$BAK_PREFIX"
-fi
-
-cat > "$CONFIG" <<EOF
-{
-  "$schema": "https://opencode.ai/config.json",
-  "model": "custom/{{defaultModel}}",
-  "provider": {
-    "custom": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Custom",
-      "options": {
-        "baseURL": "{{baseUrl}}",
-        "apiKey": "{{apiKey}}"
-      },
-      "models": {
-        "{{defaultModel}}": {
-          "name": "{{defaultModel}}"
-        }
-      }
-    }
-  }
-}
-EOF
-echo "Opencode 配置已更新: $CONFIG""#,
-    ),
-];
-
 impl SecureStore {
-    pub fn new(app: tauri::AppHandle) -> Result<Self, StoreError> {
+    pub fn new(
+        app: tauri::AppHandle,
+        builtin_templates: Vec<BuiltinTargetTemplate>,
+    ) -> Result<Self, StoreError> {
         let mut root = app.path().app_data_dir().map_err(|e| {
             eprintln!("[secure_store] app_data_dir error: {:?}", e);
             StoreError::Crypto
@@ -340,46 +81,7 @@ impl SecureStore {
         } else {
             StoreFile::default()
         };
-        let _builtin_ids: Vec<&str> = DEFAULT_TARGETS.iter().map(|(id, _, _, _)| *id).collect();
-        // 确保所有内置目标都存在（兼容旧数据）
-        for (id, name, is_remote, script) in DEFAULT_TARGETS {
-            if !state.export_targets.iter().any(|t| t.id == *id) {
-                state.export_targets.insert(
-                    0,
-                    ExportTarget {
-                        id: id.to_string(),
-                        name: name.to_string(),
-                        is_remote: *is_remote,
-                        ssh_command: String::new(),
-                        bash_script: script.to_string(),
-                        save_as_default_script: None,
-                        restore_default_script: None,
-                        is_builtin: true,
-                    },
-                );
-            } else {
-                // 强制同步内置目标的脚本和名称，确保版本更新后脚本随之更新
-                for t in &mut state.export_targets {
-                    if t.id == *id {
-                        t.bash_script = script.to_string();
-                        t.name = name.to_string();
-                        t.is_builtin = true;
-                    }
-                }
-            }
-        }
-        // 按指定顺序重新排序内置目标
-        let target_order = ["claude-code", "codex", "gemini-cli", "opencode", "cursor"];
-        state.export_targets.sort_by(|a, b| {
-            let a_pos = target_order.iter().position(|&x| x == a.id);
-            let b_pos = target_order.iter().position(|&x| x == b.id);
-            match (a_pos, b_pos) {
-                (Some(ao), Some(bo)) => ao.cmp(&bo),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
-        });
+        sync_builtin_targets(&mut state.export_targets, &builtin_templates);
         write_encrypted(&root, &key, &state)?;
         Ok(Self {
             path: root,
@@ -499,6 +201,8 @@ impl SecureStore {
                     target.is_remote = input.is_remote;
                     target.ssh_command = input.ssh_command.clone();
                     target.bash_script = input.bash_script.clone();
+                    target.save_as_default_script = input.save_as_default_script.clone();
+                    target.restore_default_script = input.restore_default_script.clone();
                     saved = Some(target.clone());
                     break;
                 }
@@ -513,8 +217,8 @@ impl SecureStore {
                 is_remote: input.is_remote,
                 ssh_command: input.ssh_command,
                 bash_script: input.bash_script,
-                save_as_default_script: None,
-                restore_default_script: None,
+                save_as_default_script: input.save_as_default_script,
+                restore_default_script: input.restore_default_script,
                 is_builtin: false,
             };
             guard.export_targets.push(new_item.clone());
@@ -567,6 +271,56 @@ impl SecureStore {
         write_encrypted(&self.path, &self.key, &guard)?;
         Ok(())
     }
+}
+
+fn sync_builtin_targets(
+    export_targets: &mut Vec<ExportTarget>,
+    builtin_templates: &[BuiltinTargetTemplate],
+) {
+    for template in builtin_templates {
+        if let Some(existing) = export_targets
+            .iter_mut()
+            .find(|item| item.id == template.id)
+        {
+            existing.name = template.name.clone();
+            existing.is_remote = template.is_remote;
+            existing.bash_script = template.bash_script.clone();
+            existing.save_as_default_script = Some(template.save_as_default_script.clone());
+            existing.restore_default_script = Some(template.restore_default_script.clone());
+            existing.is_builtin = true;
+            continue;
+        }
+
+        export_targets.insert(
+            0,
+            ExportTarget {
+                id: template.id.clone(),
+                name: template.name.clone(),
+                is_remote: template.is_remote,
+                ssh_command: String::new(),
+                bash_script: template.bash_script.clone(),
+                save_as_default_script: Some(template.save_as_default_script.clone()),
+                restore_default_script: Some(template.restore_default_script.clone()),
+                is_builtin: true,
+            },
+        );
+    }
+
+    let builtin_order = builtin_templates
+        .iter()
+        .map(|template| (template.id.as_str(), template.order))
+        .collect::<std::collections::HashMap<_, _>>();
+
+    export_targets.sort_by(|a, b| {
+        let a_pos = builtin_order.get(a.id.as_str()).copied();
+        let b_pos = builtin_order.get(b.id.as_str()).copied();
+        match (a_pos, b_pos) {
+            (Some(ao), Some(bo)) => ao.cmp(&bo),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    });
 }
 
 fn load_or_create_master_key() -> Result<[u8; 32], StoreError> {
@@ -639,4 +393,87 @@ fn write_encrypted(path: &PathBuf, key: &[u8; 32], store: &StoreFile) -> Result<
     );
     fs::write(path, data)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::templates::loader::load_builtin_templates_from_dir;
+
+    fn load_test_builtin_templates() -> Vec<BuiltinTargetTemplate> {
+        load_builtin_templates_from_dir(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/templates/builtin"),
+        )
+        .expect("builtin template resources should load")
+    }
+
+    #[test]
+    fn builtin_targets_should_include_save_and_restore_scripts() {
+        let mut export_targets = Vec::new();
+        let builtin_templates = load_test_builtin_templates();
+        sync_builtin_targets(&mut export_targets, &builtin_templates);
+
+        assert!(
+            export_targets
+                .iter()
+                .all(|target| target.save_as_default_script.is_some()),
+            "all builtin targets should provide a save-as-default script"
+        );
+        assert!(
+            export_targets
+                .iter()
+                .all(|target| target.restore_default_script.is_some()),
+            "all builtin targets should provide a restore-default script"
+        );
+    }
+
+    #[test]
+    fn sync_builtin_targets_repairs_existing_builtin_targets() {
+        let mut export_targets = vec![
+            ExportTarget {
+                id: "claude-code".to_string(),
+                name: "Old Claude".to_string(),
+                is_remote: true,
+                ssh_command: "ssh stale".to_string(),
+                bash_script: "echo stale".to_string(),
+                save_as_default_script: None,
+                restore_default_script: None,
+                is_builtin: false,
+            },
+            ExportTarget {
+                id: "custom-target".to_string(),
+                name: "Custom".to_string(),
+                is_remote: false,
+                ssh_command: String::new(),
+                bash_script: "echo custom".to_string(),
+                save_as_default_script: Some("echo save".to_string()),
+                restore_default_script: Some("echo restore".to_string()),
+                is_builtin: false,
+            },
+        ];
+        let builtin_templates = load_test_builtin_templates();
+
+        sync_builtin_targets(&mut export_targets, &builtin_templates);
+
+        let claude = export_targets
+            .iter()
+            .find(|target| target.id == "claude-code")
+            .expect("claude-code builtin target should exist");
+        assert_eq!(claude.name, "Claude Code");
+        assert!(!claude.is_remote);
+        assert!(claude.save_as_default_script.is_some());
+        assert!(claude.restore_default_script.is_some());
+        assert!(claude.is_builtin);
+
+        let custom = export_targets
+            .iter()
+            .find(|target| target.id == "custom-target")
+            .expect("custom target should be preserved");
+        assert_eq!(custom.name, "Custom");
+        assert_eq!(custom.save_as_default_script.as_deref(), Some("echo save"));
+        assert_eq!(
+            custom.restore_default_script.as_deref(),
+            Some("echo restore")
+        );
+    }
 }

@@ -41,6 +41,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": {
+      "resources/templates/": "templates/"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/32x32@2x.png",

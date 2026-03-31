@@ -1,0 +1,11 @@
+{
+  "id": "cursor",
+  "name": "Cursor",
+  "order": 50,
+  "isRemote": false,
+  "scripts": {
+    "deploy": "deploy.sh",
+    "saveDefault": "save-default.sh",
+    "restoreDefault": "restore-default.sh"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "claude-code",
+  "name": "Claude Code",
+  "order": 10,
+  "isRemote": false,
+  "scripts": {
+    "deploy": "deploy.sh",
+    "saveDefault": "save-default.sh",
+    "restoreDefault": "restore-default.sh"
+  }
+}

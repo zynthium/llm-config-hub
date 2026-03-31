@@ -1,5 +1,6 @@
 mod commands;
 mod services;
+mod templates;
 mod types;
 
 use tauri::{
@@ -30,7 +31,9 @@ pub fn run() {
                         .build(),
                 )?;
             }
-            let secure_store = services::secure_store::SecureStore::new(app.handle().clone())?;
+            let builtin_templates = templates::load_builtin_templates(&app.handle())?;
+            let secure_store =
+                services::secure_store::SecureStore::new(app.handle().clone(), builtin_templates)?;
             app.manage(secure_store);
 
             let show = MenuItemBuilder::with_id("show", "显示").build(app)?;

@@ -5,7 +5,7 @@ import reactPlugin from 'eslint-plugin-react';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '.git/**'],
+    ignores: ['dist/**', 'node_modules/**', '.git/**', '**/target/**'],
   },
   {
     files: ['**/*.ts', '**/*.tsx'],

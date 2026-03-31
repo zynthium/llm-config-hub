@@ -1,0 +1,11 @@
+{
+  "id": "gemini-cli",
+  "name": "Gemini CLI",
+  "order": 30,
+  "isRemote": false,
+  "scripts": {
+    "deploy": "deploy.sh",
+    "saveDefault": "save-default.sh",
+    "restoreDefault": "restore-default.sh"
+  }
+}
