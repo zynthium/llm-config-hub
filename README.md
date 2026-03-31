@@ -6,7 +6,7 @@
 
 - 本地安全保存模型配置（`name/provider/baseUrl/apiKey/defaultModel`）
 - macOS Keychain 托管主密钥，磁盘加密保存配置数据
-- 本机导入适配：`Claude Code`、`Cursor`、`Codex`、`OpenClaw`
+- 本机导入适配：`Claude Code`、`Cursor`、`Codex`、`OpenCode`
 - SSH（密钥登录）远程导入配置到目标主机
 - 从文本中解析 `apiKey/baseUrl/model/provider` 并一键入库
 - 对单配置或全量配置做 key 可用性检测和错误归因
@@ -43,8 +43,8 @@ cd src-tauri && cargo check
 
 ## 关键目录
 
-- `src/pages/`：四个核心功能页面（配置、导入、剪贴板、健康检测）
-- `src/lib/tauri-api.ts`：前端与 Tauri command 调用层
+- `src/components/`：核心界面组件（配置、目标、部署、导入等）
+- `src/lib/`：前端与 Tauri command 调用层与通用工具
 - `src-tauri/src/commands/`：命令入口
 - `src-tauri/src/services/`：安全存储、导入、SSH、解析、探活逻辑
 - `src-tauri/src/types.rs`：后端共享数据类型

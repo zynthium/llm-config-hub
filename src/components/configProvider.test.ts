@@ -35,3 +35,36 @@ test('resolveProvider infers Ollama from localhost endpoint', () => {
     'Ollama'
   );
 });
+
+test('resolveProvider infers Anthropic from apiKey regardless of case', () => {
+  assert.equal(
+    resolveProvider({
+      provider: '',
+      baseUrl: '',
+      apiKey: 'SK-ANT-EXAMPLE',
+    }),
+    'Anthropic'
+  );
+});
+
+test('resolveProvider infers Google from apiKey regardless of case', () => {
+  assert.equal(
+    resolveProvider({
+      provider: '',
+      baseUrl: '',
+      apiKey: 'aIzAsyFakeKey',
+    }),
+    'Google'
+  );
+});
+
+test('resolveProvider falls back to Custom when no signal is available', () => {
+  assert.equal(
+    resolveProvider({
+      provider: '',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: '',
+    }),
+    'Custom'
+  );
+});
