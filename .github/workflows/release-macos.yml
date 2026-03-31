@@ -77,9 +77,14 @@ jobs:
       - name: Create DMG
         run: |
           bundle="${{ steps.find-bundle.outputs.BUNDLE_PATH }}"
+          stage_dir="artifacts/${{ matrix.arch }}/dmg-root"
           dmg_path="artifacts/${{ matrix.arch }}/${APP_NAME}-${{ matrix.arch }}-macos.dmg"
           mkdir -p "artifacts/${{ matrix.arch }}"
-          hdiutil create -volname "${APP_NAME} ${{ matrix.volume_suffix }}" -srcfolder "$bundle" -ov -format UDZO "$dmg_path"
+          rm -rf "$stage_dir"
+          mkdir -p "$stage_dir"
+          cp -R "$bundle" "$stage_dir/"
+          ln -s /Applications "$stage_dir/Applications"
+          hdiutil create -volname "${APP_NAME} ${{ matrix.volume_suffix }}" -srcfolder "$stage_dir" -ov -format UDZO "$dmg_path"
 
       - name: Upload DMG artifact
         if: ${{ github.event_name == 'release' }}
@@ -243,9 +248,15 @@ jobs:
 
       - name: Create Universal DMG
         run: |
+          stage_dir="artifacts/universal/dmg-root"
+          universal_app="build/universal/${APP_NAME}-universal.app"
           dmg_path="artifacts/universal/${APP_NAME}-universal-macos.dmg"
           mkdir -p artifacts/universal
-          hdiutil create -volname "${APP_NAME} Universal" -srcfolder "build/universal/${APP_NAME}-universal.app" -ov -format UDZO "$dmg_path"
+          rm -rf "$stage_dir"
+          mkdir -p "$stage_dir"
+          cp -R "$universal_app" "$stage_dir/"
+          ln -s /Applications "$stage_dir/Applications"
+          hdiutil create -volname "${APP_NAME} Universal" -srcfolder "$stage_dir" -ov -format UDZO "$dmg_path"
 
       - name: Upload Universal artifact
         if: ${{ github.event_name == 'release' }}
