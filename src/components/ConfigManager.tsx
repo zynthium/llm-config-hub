@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocalStorage } from 'react-use';
 import { saveHealthCache, loadHealthCache, removeHealthCache, formatCheckedAt } from '../utils/healthCache';
 import { invoke } from '@tauri-apps/api/core';
 import { Plus, Edit2, Trash2, Copy, Eye, EyeOff, Check, Database, CheckCircle2, XCircle, HelpCircle, LayoutGrid, List, Tag, Send, Play, Loader2, Filter, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
-import { LLMConfig, ModelHealthResult } from '../types';
+import { LLMConfig, ExportTarget, ModelHealthResult } from '../types';
 import {
   Select,
   SelectContent,
@@ -18,7 +18,15 @@ import ConfigModal from './ConfigModal';
 import DeployModal from './DeployModal';
 import ConfirmModal from './ConfirmModal';
 
-export default function ConfigManager({ configs, targets, addConfig, updateConfig, deleteConfig }: any) {
+interface ConfigManagerProps {
+  configs: LLMConfig[];
+  targets: ExportTarget[];
+  addConfig: (config: Omit<LLMConfig, 'id' | 'createdAt' | 'updatedAt'>) => Promise<LLMConfig>;
+  updateConfig: (id: string, updated: Partial<Omit<LLMConfig, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<LLMConfig | undefined>;
+  deleteConfig: (id: string) => Promise<void>;
+}
+
+export default function ConfigManager({ configs, targets, addConfig, updateConfig, deleteConfig }: ConfigManagerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<LLMConfig | null>(null);
   const [deployConfig, setDeployConfig] = useState<LLMConfig | null>(null);
@@ -35,12 +43,20 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
   const [modelExpanded, setModelExpanded] = useState<Record<string, boolean>>({});
   const [testingModels, setTestingModels] = useState<Record<string, boolean>>({});
 
-  const allTags = Array.from(new Set(configs.flatMap((c: LLMConfig) => c.tags || []))).sort();
-  const filteredConfigs = configs.filter((c: LLMConfig) => {
-    const matchTag = selectedTag === 'all' || (c.tags && c.tags.includes(selectedTag));
-    const matchStatus = selectedStatus === 'all' || c.status === selectedStatus || (selectedStatus === 'untested' && !c.status);
-    return matchTag && matchStatus;
-  });
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const allTags = useMemo(
+    () => Array.from(new Set(configs.flatMap((c) => c.tags || []))).sort(),
+    [configs]
+  );
+  const filteredConfigs = useMemo(
+    () => configs.filter((c) => {
+      const matchTag = selectedTag === 'all' || (c.tags && c.tags.includes(selectedTag));
+      const matchStatus = selectedStatus === 'all' || c.status === selectedStatus || (selectedStatus === 'untested' && !c.status);
+      return matchTag && matchStatus;
+    }),
+    [configs, selectedTag, selectedStatus]
+  );
 
   const toggleKeyVisibility = (id: string) => {
     setVisibleKeys(prev => ({ ...prev, [id]: !prev[id] }));
@@ -49,8 +65,15 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const testConnection = async (config: LLMConfig) => {
     if (testingRefs.current.has(config.id)) return;
@@ -102,6 +125,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
   };
 
   useEffect(() => {
+    if (configs.length === 0) return;
     const loadCaches = async () => {
     const cachedResults: Record<string, ModelHealthResult[]> = {};
     const cachedAt: Record<string, number> = {};
@@ -118,7 +142,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
     }
     };
     loadCaches();
-  }, []);
+  }, [configs]);
 
   useEffect(() => {
     const untestedConfigs = configs.filter((c: LLMConfig) => !c.status || c.status === 'untested');
@@ -241,7 +265,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tags</SelectItem>
-                  {allTags.map((tag: any) => (
+                  {allTags.map((tag) => (
                     <SelectItem key={tag} value={tag}>{tag}</SelectItem>
                   ))}
                 </SelectContent>
@@ -506,7 +530,7 @@ export default function ConfigManager({ configs, targets, addConfig, updateConfi
           config={editingConfig}
           configs={configs}
           onClose={() => setIsModalOpen(false)}
-          onSave={(data: any) => {
+          onSave={(data: Omit<LLMConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
             if (editingConfig) {
               updateConfig(editingConfig.id, data);
             } else {

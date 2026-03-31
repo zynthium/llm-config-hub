@@ -40,8 +40,11 @@ pub fn run() {
             let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
             let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
 
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+            let mut tray_builder = TrayIconBuilder::new();
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+            let _tray = tray_builder
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .tooltip("LLM Config Hub")

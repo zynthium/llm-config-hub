@@ -9,7 +9,14 @@ import { Button } from './ui/Button';
 import { saveHealthCache, loadHealthCache, formatCheckedAt } from '../utils/healthCache';
 import { DEFAULT_URLS, PROVIDERS, resolveProvider } from './configProvider';
 
-export default function ConfigModal({ config, configs = [], onClose, onSave }: any) {
+interface ConfigModalProps {
+  config: LLMConfig | null;
+  configs: LLMConfig[];
+  onClose: () => void;
+  onSave: (data: Omit<LLMConfig, 'id' | 'createdAt' | 'updatedAt'>) => void;
+}
+
+export default function ConfigModal({ config, configs = [], onClose, onSave }: ConfigModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     provider: 'Custom' as Provider,
@@ -102,7 +109,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
     setIsTesting(true);
     setTestResult(null);
     try {
-      const result: any = await invoke('test_connection', {
+      const result = await invoke<{ status: string; message?: string }>('test_connection', {
         provider: formData.provider,
         baseUrl: formData.baseUrl,
         apiKey: formData.apiKey,
@@ -115,8 +122,8 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
         setTestResult({ valid: false, message: result.message || 'Connection failed.' });
         setFormData(prev => ({ ...prev, status: 'invalid' }));
       }
-    } catch (e: any) {
-      setTestResult({ valid: false, message: e.toString() });
+    } catch (e: unknown) {
+      setTestResult({ valid: false, message: e instanceof Error ? e.message : String(e) });
       setFormData(prev => ({ ...prev, status: 'invalid' }));
     } finally {
       setIsTesting(false);
@@ -129,7 +136,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
     setModelResults([]);
     setModelsExpanded(true);
     try {
-      console.log('[probe] calling with:', { provider: formData.provider, baseUrl: formData.baseUrl, apiKey: formData.apiKey, models: formData.models || null });
+      console.log('[probe] calling with:', { provider: formData.provider, baseUrl: formData.baseUrl, models: formData.models || null });
       const results: ModelHealthResult[] = await invoke('probe_models_adhoc', {
         provider: formData.provider,
         baseUrl: formData.baseUrl,
@@ -142,7 +149,7 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
         const cached = await loadHealthCache(config.id);
         if (cached) setModelCheckedAt(cached.checkedAt);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setModelResults([]);
       console.error('[probe_models_adhoc] error:', e);
     } finally {
@@ -183,14 +190,23 @@ export default function ConfigModal({ config, configs = [], onClose, onSave }: a
 
     const finalData = {
       ...formData,
+      billingType: formData.billingType as 'free' | 'paid',
       tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
     };
 
     onSave(finalData);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-5 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">

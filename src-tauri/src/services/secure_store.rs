@@ -62,7 +62,7 @@ impl SecureStore {
         builtin_templates: Vec<BuiltinTargetTemplate>,
     ) -> Result<Self, StoreError> {
         let mut root = app.path().app_data_dir().map_err(|e| {
-            eprintln!("[secure_store] app_data_dir error: {:?}", e);
+            log::debug!("[secure_store] app_data_dir error: {:?}", e);
             StoreError::Crypto
         })?;
         if !root.exists() {
@@ -70,12 +70,12 @@ impl SecureStore {
         }
         root.push("config_store.enc");
         let key = load_or_create_master_key().map_err(|e| {
-            eprintln!("[secure_store] master_key error: {:?}", e);
+            log::debug!("[secure_store] master_key error: {:?}", e);
             e
         })?;
         let mut state = if root.exists() {
             read_encrypted(&root, &key).map_err(|e| {
-                eprintln!("[secure_store] read_encrypted error: {:?}", e);
+                log::debug!("[secure_store] read_encrypted error: {:?}", e);
                 e
             })?
         } else {
@@ -95,7 +95,7 @@ impl SecureStore {
     pub fn list_configs(&self) -> Vec<ModelConfig> {
         self.state
             .lock()
-            .expect("store lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .model_configs
             .clone()
     }
@@ -103,7 +103,7 @@ impl SecureStore {
     pub fn get_config(&self, id: &str) -> Option<ModelConfig> {
         self.state
             .lock()
-            .expect("store lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .model_configs
             .iter()
             .find(|m| m.id == id)
@@ -111,7 +111,7 @@ impl SecureStore {
     }
 
     pub fn upsert_config(&self, input: NewModelConfig) -> Result<ModelConfig, StoreError> {
-        let mut guard = self.state.lock().expect("store lock poisoned");
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let now = Utc::now();
         let mut saved = None;
         for config in &mut guard.model_configs {
@@ -161,7 +161,7 @@ impl SecureStore {
     }
 
     pub fn delete_config(&self, id: &str) -> Result<(), StoreError> {
-        let mut guard = self.state.lock().expect("store lock poisoned");
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let old_len = guard.model_configs.len();
         guard.model_configs.retain(|m| m.id != id);
         if old_len == guard.model_configs.len() {
@@ -176,13 +176,13 @@ impl SecureStore {
     pub fn list_targets(&self) -> Vec<ExportTarget> {
         self.state
             .lock()
-            .expect("store lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .export_targets
             .clone()
     }
 
     pub fn upsert_target(&self, input: NewExportTarget) -> Result<ExportTarget, StoreError> {
-        let mut guard = self.state.lock().expect("store lock poisoned");
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         // 拒绝编辑内置目标
         if let Some(id) = &input.id {
             if guard
@@ -229,7 +229,7 @@ impl SecureStore {
     }
 
     pub fn delete_target(&self, id: &str) -> Result<(), StoreError> {
-        let mut guard = self.state.lock().expect("store lock poisoned");
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         // 拒绝删除内置目标
         if guard
             .export_targets
@@ -252,7 +252,7 @@ impl SecureStore {
         config_id: &str,
         results: Vec<ModelHealthResult>,
     ) -> Result<(), StoreError> {
-        let mut guard = self.state.lock().expect("store lock poisoned");
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         guard
             .model_health_cache
             .insert(config_id.to_string(), results);
@@ -261,12 +261,12 @@ impl SecureStore {
     }
 
     pub fn load_model_health_cache(&self, config_id: &str) -> Option<Vec<ModelHealthResult>> {
-        let guard = self.state.lock().expect("store lock poisoned");
+        let guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         guard.model_health_cache.get(config_id).cloned()
     }
 
     pub fn remove_model_health_cache(&self, config_id: &str) -> Result<(), StoreError> {
-        let mut guard = self.state.lock().expect("store lock poisoned");
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
         guard.model_health_cache.remove(config_id);
         write_encrypted(&self.path, &self.key, &guard)?;
         Ok(())
@@ -325,27 +325,27 @@ fn sync_builtin_targets(
 
 fn load_or_create_master_key() -> Result<[u8; 32], StoreError> {
     let entry = keyring::Entry::new("llm-config-hub", "master-key")?;
-    eprintln!("[keyring] entry created");
+    log::debug!("[keyring] entry created");
     let raw = match entry.get_password() {
         Ok(v) if !v.is_empty() => {
-            eprintln!("[keyring] found existing key, len={}", v.len());
+            log::debug!("[keyring] found existing key, len={}", v.len());
             v
         }
         Ok(_) | Err(_) => {
-            eprintln!("[keyring] no valid key found, checking migration or generating new");
+            log::debug!("[keyring] no valid key found, checking migration or generating new");
             // 尝试从旧 service name 迁移
             let migrated = keyring::Entry::new("ai-key-manager", "master-key")
                 .ok()
                 .and_then(|old_entry| old_entry.get_password().ok())
                 .filter(|v| !v.is_empty());
             if let Some(old_val) = migrated {
-                eprintln!("[keyring] migrating from ai-key-manager");
+                log::debug!("[keyring] migrating from ai-key-manager");
                 entry.set_password(&old_val)?;
                 let _ = keyring::Entry::new("ai-key-manager", "master-key")
                     .map(|e| e.delete_credential());
                 old_val
             } else {
-                eprintln!("[keyring] generating new master key");
+                log::debug!("[keyring] generating new master key");
                 let mut key = [0u8; 32];
                 rand::thread_rng().fill_bytes(&mut key);
                 let encoded = BASE64.encode(key);
@@ -391,7 +391,9 @@ fn write_encrypted(path: &PathBuf, key: &[u8; 32], store: &StoreFile) -> Result<
         BASE64.encode(nonce_bytes),
         BASE64.encode(encrypted)
     );
-    fs::write(path, data)?;
+    let tmp_path = path.with_extension("enc.tmp");
+    fs::write(&tmp_path, &data)?;
+    fs::rename(&tmp_path, path)?;
     Ok(())
 }
 

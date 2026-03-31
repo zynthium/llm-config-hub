@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Copy, Check, Play, ChevronDown, ChevronRight, Loader2, CheckCircle2, XCircle, Bookmark, RotateCcw } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from './ui/Button';
@@ -18,6 +18,22 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
   const [runResult, setRunResult] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [activeTabs, setActiveTabs] = useState<Record<string, 'deploy' | 'save' | 'restore'>>({});
 
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const getSnippet = (target: ExportTarget) => {
     const { baseUrl, apiKey, models, defaultModel } = config;
     let script = target.bashScript
@@ -36,7 +52,8 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
   const handleCopy = (target: ExportTarget) => {
     navigator.clipboard.writeText(getSnippet(target));
     setCopiedId(target.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
   };
 
   const toggleExpand = (id: string) => {
@@ -122,7 +139,7 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}
@@ -267,6 +284,7 @@ export default function DeployModal({ config, targets, onClose }: { config: LLMC
                           </button>
                         )}
                       </div>
+                      {/* Safe: Prism.highlight encodes HTML entities; CSP blocks inline scripts */}
                       <div
                         className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed"
                         dangerouslySetInnerHTML={{

@@ -4,6 +4,10 @@ use std::process::Command;
 
 use crate::types::SshImportInput;
 
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
 pub fn import_via_ssh(input: &SshImportInput, payload: &str) -> Result<(), String> {
     let remote_path = input
         .remote_path
@@ -31,19 +35,22 @@ pub fn import_via_ssh(input: &SshImportInput, payload: &str) -> Result<(), Strin
         .map(|v| v.display().to_string())
         .unwrap_or_else(|| "~".to_string());
 
+    let quoted_remote = shell_quote(&remote_path);
+    let quoted_parent = shell_quote(&parent);
+
     // 备份逻辑：若目标文件存在，先检查同目录下是否已有内容一致的备份，无则创建带时间戳的备份
     let backup_cmd = format!(
-        r#"if [ -f {remote_path} ]; then \
-  _content=$(cat {remote_path}); \
+        r#"if [ -f {quoted_remote} ]; then \
+  _content=$(cat {quoted_remote}); \
   _ts=$(date +%s); \
-  _stem=$(basename {remote_path} .json); \
-  _dir={parent}; \
+  _stem=$(basename {quoted_remote} .json); \
+  _dir={quoted_parent}; \
   _found=0; \
   for _bak in "$_dir"/*.bak.*  "$_dir"/*.bak; do \
     [ -f "$_bak" ] || continue; \
     if [ "$(cat "$_bak")" = "$_content" ]; then _found=1; break; fi; \
   done; \
-  if [ "$_found" = "0" ]; then cp {remote_path} "$_dir/$_stem.$_ts.bak.json"; fi; \
+  if [ "$_found" = "0" ]; then cp {quoted_remote} "$_dir/$_stem.$_ts.bak.json"; fi; \
 fi"#
     );
     run_cmd(
@@ -58,8 +65,10 @@ fi"#
         ],
     )?;
 
-    let deploy_cmd = format!("mkdir -p {parent} && cp {temp_name} {remote_path}");
-    run_cmd(
+    let deploy_cmd = format!(
+        "mkdir -p {quoted_parent} && cp {temp_name} {quoted_remote}"
+    );
+    let result = run_cmd(
         "ssh",
         &[
             "-p",
@@ -69,8 +78,12 @@ fi"#
             &host,
             &deploy_cmd,
         ],
-    )?;
-    Ok(())
+    );
+
+    // Clean up local temp file regardless of success or failure
+    let _ = fs::remove_file(&local_tmp);
+
+    result
 }
 
 fn temp_local_file() -> Result<PathBuf, String> {

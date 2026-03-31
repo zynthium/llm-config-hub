@@ -8,12 +8,12 @@ use crate::types::{HealthCheckResult, ModelConfig, ModelHealthResult};
 pub async fn check_config(config: &ModelConfig) -> HealthCheckResult {
     let start = Instant::now();
     let base = config.base_url.trim_end_matches('/');
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .unwrap_or_default();
-
     let provider = config.provider.as_str();
+    let mut builder = reqwest::Client::builder();
+    if provider == "Ollama" {
+        builder = builder.no_proxy();
+    }
+    let client = builder.build().unwrap_or_default();
 
     let response = if provider == "Anthropic" {
         let url = format!("{base}/v1/messages");
@@ -102,22 +102,22 @@ fn map_status_to_error(status: StatusCode) -> Option<String> {
 async fn discover_models_ollama(client: &reqwest::Client, base: &str) -> Vec<String> {
     let root = base.trim_end_matches("/v1").trim_end_matches('/');
     let url = format!("{root}/api/tags");
-    eprintln!("[ollama] discover url: {url}");
+    log::debug!("[ollama] discover url: {url}");
     let resp_result = client
         .get(&url)
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await;
     let Ok(resp) = resp_result else {
-        eprintln!("[ollama] request error: {:?}", resp_result.unwrap_err());
+        log::debug!("[ollama] request error: {:?}", resp_result.unwrap_err());
         return Vec::new();
     };
-    eprintln!("[ollama] status: {}", resp.status());
+    log::debug!("[ollama] status: {}", resp.status());
     if !resp.status().is_success() {
         return Vec::new();
     }
     let body = resp.text().await.unwrap_or_default();
-    eprintln!("[ollama] body (first 200): {}", &body[..body.len().min(200)]);
+    log::debug!("[ollama] body (first 200): {}", &body[..body.len().min(200)]);
     let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) else {
         return Vec::new();
     };
@@ -315,12 +315,13 @@ async fn probe_model_openai(
 }
 
 pub async fn check_models_for_config(config: &ModelConfig) -> Vec<ModelHealthResult> {
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .unwrap_or_default();
     let base = config.base_url.trim_end_matches('/');
     let provider = config.provider.as_str();
+    let mut builder = reqwest::Client::builder();
+    if provider == "Ollama" {
+        builder = builder.no_proxy();
+    }
+    let client = builder.build().unwrap_or_default();
 
     // Explicit models from config
     let explicit_models: Vec<String> = config
@@ -411,31 +412,6 @@ pub async fn check_models_for_config(config: &ModelConfig) -> Vec<ModelHealthRes
                     .header("Content-Type", "application/json")
                     .timeout(std::time::Duration::from_secs(10))
                     .body(r#"{"contents":[{"parts":[{"text":"hi"}]}]}"#)
-                    .send()
-                    .await;
-                let latency_ms = start.elapsed().as_millis();
-                match resp {
-                    Ok(r) if r.status().is_success() => {
-                        ModelHealthResult { config_id: config.id.clone(), model, status: "ok".to_string(), latency_ms, error_type: None, checked_at: Utc::now() }
-                    }
-                    Ok(r) => ModelHealthResult { config_id: config.id.clone(), model, status: "fail".to_string(), latency_ms, error_type: map_status_to_error(r.status()), checked_at: Utc::now() },
-                    Err(e) => ModelHealthResult { config_id: config.id.clone(), model, status: "fail".to_string(), latency_ms, error_type: Some(if e.is_timeout() { "network-timeout".to_string() } else { "network-error".to_string() }), checked_at: Utc::now() },
-                }
-            }
-            "Ollama" => {
-                let start = Instant::now();
-                let url = format!("{base}/api/chat");
-                let body = serde_json::json!({
-                    "model": model,
-                    "messages": [{"role": "user", "content": "hi"}],
-                    "stream": false
-                })
-                .to_string();
-                let resp = client
-                    .post(&url)
-                    .header("Content-Type", "application/json")
-                    .timeout(std::time::Duration::from_secs(10))
-                    .body(body)
                     .send()
                     .await;
                 let latency_ms = start.elapsed().as_millis();

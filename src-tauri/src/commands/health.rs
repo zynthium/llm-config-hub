@@ -47,11 +47,9 @@ pub async fn check_all_health(
     store: State<'_, SecureStore>,
 ) -> Result<Vec<HealthCheckResult>, String> {
     let configs = store.list_configs();
-    let mut out = Vec::with_capacity(configs.len());
-    for cfg in configs {
-        out.push(check_config(&cfg).await);
-    }
-    Ok(out)
+    let futures: Vec<_> = configs.iter().map(|cfg| check_config(cfg)).collect();
+    let results = futures::future::join_all(futures).await;
+    Ok(results)
 }
 
 #[tauri::command]

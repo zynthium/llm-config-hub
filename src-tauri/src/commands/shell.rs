@@ -3,6 +3,12 @@ use tauri::{AppHandle, Manager};
 
 #[tauri::command]
 pub fn run_bash_script(script: String) -> Result<String, String> {
+    let trimmed = script.trim();
+    if trimmed.is_empty() {
+        return Err("script is empty".to_string());
+    }
+    log::info!("[shell] executing script ({} bytes)", trimmed.len());
+
     let output = Command::new("bash")
         .arg("-c")
         .arg(&script)

@@ -1,16 +1,22 @@
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 use crate::types::ParsedClipboard;
 
+static SK_KEY_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(sk-[A-Za-z0-9_\-]{16,})").unwrap());
+static XAI_KEY_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(xai-[A-Za-z0-9_\-]{16,})").unwrap());
+static CLAUDE_KEY_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(claude-[A-Za-z0-9_\-]{16,})").unwrap());
+static BASE_URL_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(https?://[^\s"']+)"#).unwrap());
+static MODEL_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(gpt-[A-Za-z0-9\-.]+|claude-[A-Za-z0-9\-.]+)").unwrap());
+
 pub fn parse_clipboard(input: &str) -> ParsedClipboard {
-    let api_key_patterns = vec![
-        Regex::new(r"(sk-[A-Za-z0-9_\-]{16,})").expect("valid regex"),
-        Regex::new(r"(xai-[A-Za-z0-9_\-]{16,})").expect("valid regex"),
-        Regex::new(r"(claude-[A-Za-z0-9_\-]{16,})").expect("valid regex"),
-    ];
-    let base_url_pattern = Regex::new(r#"(https?://[^\s"']+)"#).expect("valid regex");
-    let model_pattern = Regex::new(r"(gpt-[A-Za-z0-9\-.]+|claude-[A-Za-z0-9\-.]+)")
-        .expect("valid regex");
+    let api_key_patterns = [&*SK_KEY_PATTERN, &*XAI_KEY_PATTERN, &*CLAUDE_KEY_PATTERN];
 
     let mut api_key = None;
     for pattern in api_key_patterns {
@@ -20,10 +26,10 @@ pub fn parse_clipboard(input: &str) -> ParsedClipboard {
         }
     }
 
-    let base_url = base_url_pattern
+    let base_url = BASE_URL_PATTERN
         .find(input)
         .map(|m| m.as_str().trim_end_matches('/').to_string());
-    let default_model = model_pattern.find(input).map(|m| m.as_str().to_string());
+    let default_model = MODEL_PATTERN.find(input).map(|m| m.as_str().to_string());
     let provider = match api_key.as_deref() {
         Some(v) if v.starts_with("xai-") => Some("xai".to_string()),
         Some(v) if v.starts_with("sk-") => Some("openai-compatible".to_string()),

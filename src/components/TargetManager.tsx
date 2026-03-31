@@ -10,7 +10,14 @@ import 'prismjs/components/prism-bash';
 import 'prismjs/themes/prism-tomorrow.css';
 import TargetIcon from './TargetIcon';
 
-export default function TargetManager({ targets, addTarget, updateTarget, deleteTarget }: any) {
+interface TargetManagerProps {
+  targets: ExportTarget[];
+  addTarget: (target: Omit<ExportTarget, 'id'>) => Promise<ExportTarget>;
+  updateTarget: (id: string, target: Omit<ExportTarget, 'id'>) => Promise<ExportTarget>;
+  deleteTarget: (id: string) => Promise<void>;
+}
+
+export default function TargetManager({ targets, addTarget, updateTarget, deleteTarget }: TargetManagerProps) {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [targetToDelete, setTargetToDelete] = useState<ExportTarget | null>(null);
@@ -112,6 +119,9 @@ export default function TargetManager({ targets, addTarget, updateTarget, delete
                 <div
                   key={target.id}
                   onClick={() => handleSelect(target.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(target.id); } }}
                   className={`w-full flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
                     selectedTargetId === target.id && !isCreating
                       ? 'border-blue-500 bg-blue-50'

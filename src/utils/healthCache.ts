@@ -15,7 +15,7 @@ export async function loadHealthCache(configId: string): Promise<HealthCache | n
     const results = await invoke<ModelHealthResult[] | null>('load_model_health_cache', { configId });
     if (!results || results.length === 0) return null;
     const checkedAt = results[0]?.checked_at
-      ? new Date(results[0].checked_at as unknown as string).getTime()
+      ? new Date(results[0].checked_at).getTime()
       : Date.now();
     return { results, checkedAt };
   } catch {

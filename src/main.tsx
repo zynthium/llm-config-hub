@@ -10,4 +10,4 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-invoke('close_splashscreen');
+invoke('close_splashscreen').catch(console.error);
