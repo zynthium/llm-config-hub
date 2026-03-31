@@ -34,7 +34,7 @@ export function normalizeProvider(provider?: string | null): Provider | null {
 
 export function inferProvider({ baseUrl, apiKey }: ProviderLike): Provider | null {
   const normalizedBaseUrl = baseUrl?.trim().toLowerCase() ?? '';
-  const normalizedApiKey = apiKey?.trim() ?? '';
+  const normalizedApiKey = apiKey?.trim().toLowerCase() ?? '';
 
   if (normalizedBaseUrl.includes('anthropic')) return 'Anthropic';
   if (normalizedBaseUrl.includes('deepseek')) return 'DeepSeek';
@@ -51,7 +51,7 @@ export function inferProvider({ baseUrl, apiKey }: ProviderLike): Provider | nul
   }
 
   if (normalizedApiKey.startsWith('sk-ant')) return 'Anthropic';
-  if (normalizedApiKey.startsWith('AIza')) return 'Google';
+  if (normalizedApiKey.startsWith('aiza')) return 'Google';
 
   return null;
 }
