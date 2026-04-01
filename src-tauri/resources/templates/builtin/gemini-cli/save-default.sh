@@ -9,30 +9,21 @@ case "$USER_SHELL" in
   fish) SHELL_RC="$HOME/.config/fish/config.fish" ;;
 esac
 
-BAK_PREFIX="$(basename "$SHELL_RC").gemini.bak."
-BAK_DIR="$(dirname "$SHELL_RC")"
-
-do_backup() {
-  local src="$1" dir="$2" prefix="$3"
-  local src_hash
-  src_hash="$(shasum -a 256 "$src" 2>/dev/null | awk '{print $1}' || md5sum "$src" 2>/dev/null | awk '{print $1}')"
-  for bak in "$dir/${prefix}"*; do
-    [ -f "$bak" ] || continue
-    local bak_hash
-    bak_hash="$(shasum -a 256 "$bak" 2>/dev/null | awk '{print $1}' || md5sum "$bak" 2>/dev/null | awk '{print $1}')"
-    if [ "$src_hash" = "$bak_hash" ]; then
-      echo "已存在内容相同的备份: $bak"
-      return 0
-    fi
-  done
-  local dst="$dir/${prefix}$(date +%s)"
-  cp "$src" "$dst"
-  echo "已备份至: $dst"
-}
+DEFAULT_BAK="$SHELL_RC.default"
 
 if [ ! -f "$SHELL_RC" ]; then
   echo "未找到 Gemini CLI shell 配置文件: $SHELL_RC"
   exit 1
 fi
 
-do_backup "$SHELL_RC" "$BAK_DIR" "$BAK_PREFIX"
+if [ -f "$DEFAULT_BAK" ]; then
+  src_hash="$(shasum -a 256 "$SHELL_RC" 2>/dev/null | awk '{print $1}' || md5sum "$SHELL_RC" 2>/dev/null | awk '{print $1}')"
+  bak_hash="$(shasum -a 256 "$DEFAULT_BAK" 2>/dev/null | md5sum "$DEFAULT_BAK" 2>/dev/null | awk '{print $1}')"
+  if [ "$src_hash" = "$bak_hash" ]; then
+    echo "当前配置与备份一致，无需重复备份"
+    exit 0
+  fi
+fi
+
+cp "$SHELL_RC" "$DEFAULT_BAK"
+echo "已备份至: $DEFAULT_BAK"

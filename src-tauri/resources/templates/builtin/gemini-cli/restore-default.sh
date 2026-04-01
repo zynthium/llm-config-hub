@@ -9,24 +9,12 @@ case "$USER_SHELL" in
   fish) SHELL_RC="$HOME/.config/fish/config.fish" ;;
 esac
 
-BAK_PREFIX="$(basename "$SHELL_RC").gemini.bak."
-BAK_DIR="$(dirname "$SHELL_RC")"
+DEFAULT_BAK="$SHELL_RC.default"
 
-latest_backup() {
-  local dir="$1" prefix="$2" latest=""
-  for candidate in "$dir"/"${prefix}"*; do
-    [ -f "$candidate" ] || continue
-    latest="$candidate"
-  done
-  [ -n "$latest" ] || return 1
-  printf '%s\n' "$latest"
-}
-
-LATEST="$(latest_backup "$BAK_DIR" "$BAK_PREFIX" || true)"
-if [ -z "$LATEST" ]; then
-  echo "未找到 Gemini CLI 备份文件: $BAK_DIR/${BAK_PREFIX}*"
+if [ ! -f "$DEFAULT_BAK" ]; then
+  echo "未找到 Gemini CLI 备份文件: $DEFAULT_BAK"
   exit 1
 fi
 
-cp "$LATEST" "$SHELL_RC"
-echo "Gemini CLI 默认配置已恢复: $LATEST"
+cp "$DEFAULT_BAK" "$SHELL_RC"
+echo "Gemini CLI 默认配置已恢复: $DEFAULT_BAK"

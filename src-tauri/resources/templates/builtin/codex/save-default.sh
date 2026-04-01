@@ -5,31 +5,41 @@ CONFIG="$CODEX_DIR/config.toml"
 AUTH="$CODEX_DIR/auth.json"
 mkdir -p "$CODEX_DIR"
 
-do_backup() {
-  local src="$1" dir="$2" prefix="$3"
-  local src_hash
-  src_hash="$(shasum -a 256 "$src" 2>/dev/null | awk '{print $1}' || md5sum "$src" 2>/dev/null | awk '{print $1}')"
-  for bak in "$dir/${prefix}"*; do
-    [ -f "$bak" ] || continue
-    local bak_hash
-    bak_hash="$(shasum -a 256 "$bak" 2>/dev/null | awk '{print $1}' || md5sum "$bak" 2>/dev/null | awk '{print $1}')"
-    if [ "$src_hash" = "$bak_hash" ]; then
-      echo "已存在内容相同的备份: $bak"
-      return 0
-    fi
-  done
-  local dst="$dir/${prefix}$(date +%s)"
-  cp "$src" "$dst"
-  echo "已备份至: $dst"
-}
-
 backed_up=0
+
 if [ -f "$CONFIG" ]; then
-  do_backup "$CONFIG" "$CODEX_DIR" "config.toml.bak."
+  DEFAULT_BAK="$CONFIG.default"
+  if [ -f "$DEFAULT_BAK" ]; then
+    src_hash="$(shasum -a 256 "$CONFIG" 2>/dev/null | awk '{print $1}' || md5sum "$CONFIG" 2>/dev/null | awk '{print $1}')"
+    bak_hash="$(shasum -a 256 "$DEFAULT_BAK" 2>/dev/null | md5sum "$DEFAULT_BAK" 2>/dev/null | awk '{print $1}')"
+    if [ "$src_hash" = "$bak_hash" ]; then
+      echo "config.toml 当前配置与备份一致，无需重复备份"
+    else
+      cp "$CONFIG" "$DEFAULT_BAK"
+      echo "已备份 config.toml 至: $DEFAULT_BAK"
+    fi
+  else
+    cp "$CONFIG" "$DEFAULT_BAK"
+    echo "已备份 config.toml 至: $DEFAULT_BAK"
+  fi
   backed_up=1
 fi
+
 if [ -f "$AUTH" ]; then
-  do_backup "$AUTH" "$CODEX_DIR" "auth.json.bak."
+  DEFAULT_BAK="$AUTH.default"
+  if [ -f "$DEFAULT_BAK" ]; then
+    src_hash="$(shasum -a 256 "$AUTH" 2>/dev/null | awk '{print $1}' || md5sum "$AUTH" 2>/dev/null | awk '{print $1}')"
+    bak_hash="$(shasum -a 256 "$DEFAULT_BAK" 2>/dev/null | md5sum "$DEFAULT_BAK" 2>/dev/null | awk '{print $1}')"
+    if [ "$src_hash" = "$bak_hash" ]; then
+      echo "auth.json 当前配置与备份一致，无需重复备份"
+    else
+      cp "$AUTH" "$DEFAULT_BAK"
+      echo "已备份 auth.json 至: $DEFAULT_BAK"
+    fi
+  else
+    cp "$AUTH" "$DEFAULT_BAK"
+    echo "已备份 auth.json 至: $DEFAULT_BAK"
+  fi
   backed_up=1
 fi
 

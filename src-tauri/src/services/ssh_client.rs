@@ -38,19 +38,10 @@ pub fn import_via_ssh(input: &SshImportInput, payload: &str) -> Result<(), Strin
     let quoted_remote = shell_quote(&remote_path);
     let quoted_parent = shell_quote(&parent);
 
-    // 备份逻辑：若目标文件存在，先检查同目录下是否已有内容一致的备份，无则创建带时间戳的备份
+    // 备份逻辑：若目标文件存在，先重命名为 原名.default 后再写入
     let backup_cmd = format!(
         r#"if [ -f {quoted_remote} ]; then \
-  _content=$(cat {quoted_remote}); \
-  _ts=$(date +%s); \
-  _stem=$(basename {quoted_remote} .json); \
-  _dir={quoted_parent}; \
-  _found=0; \
-  for _bak in "$_dir"/*.bak.*  "$_dir"/*.bak; do \
-    [ -f "$_bak" ] || continue; \
-    if [ "$(cat "$_bak")" = "$_content" ]; then _found=1; break; fi; \
-  done; \
-  if [ "$_found" = "0" ]; then cp {quoted_remote} "$_dir/$_stem.$_ts.bak.json"; fi; \
+  if [ ! -f {quoted_remote}.default ]; then cp {quoted_remote} {quoted_remote}.default; fi; \
 fi"#
     );
     run_cmd(
@@ -65,9 +56,7 @@ fi"#
         ],
     )?;
 
-    let deploy_cmd = format!(
-        "mkdir -p {quoted_parent} && cp {temp_name} {quoted_remote}"
-    );
+    let deploy_cmd = format!("mkdir -p {quoted_parent} && cp {temp_name} {quoted_remote}");
     let result = run_cmd(
         "ssh",
         &[
